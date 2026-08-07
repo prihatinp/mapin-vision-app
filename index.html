@@ -83,15 +83,123 @@
     <main class="content-area" id="contentArea">
       <!-- ================= DASHBOARD VIEW ================= -->
       <section id="view-dashboard" class="view">
-        <div class="row g-3 mb-3">
-          <div class="col-md-3"><div class="stat-card glass-card"><span class="material-icons stat-icon">precision_manufacturing</span><div class="stat-value" id="statProdToday">0</div><div class="stat-label">Produksi Hari Ini</div></div></div>
-          <div class="col-md-3"><div class="stat-card glass-card"><span class="material-icons stat-icon success">check_circle</span><div class="stat-value" id="statOk">0</div><div class="stat-label">OK Count</div></div></div>
-          <div class="col-md-3"><div class="stat-card glass-card"><span class="material-icons stat-icon danger">cancel</span><div class="stat-value" id="statNg">0</div><div class="stat-label">NG Count</div></div></div>
-          <div class="col-md-3"><div class="stat-card glass-card"><span class="material-icons stat-icon">insights</span><div class="stat-value" id="statYield">0%</div><div class="stat-label">Yield</div></div></div>
-        </div>
-        <div class="row g-3">
-          <div class="col-md-8"><div class="chart-card glass-card"><h6>Trend Harian OK/NG</h6><canvas id="dailyTrendChart" height="120"></canvas></div></div>
-          <div class="col-md-4"><div class="chart-card glass-card"><h6>Top NG Reason</h6><ul id="topNgList" class="list-unstyled"></ul></div></div>
+        <div class="dash-dark">
+          <div class="dash-kpi-row">
+            <div class="dash-kpi-card">
+              <div class="dash-kpi-icon" style="background:rgba(0,85,164,.18); color:#4dabf7;"><span class="material-icons">precision_manufacturing</span></div>
+              <div class="dash-kpi-body">
+                <div class="dash-kpi-label">Total Inspeksi</div>
+                <div class="dash-kpi-value" id="statProdToday">0</div>
+                <div class="dash-kpi-delta" id="deltaTotal">-</div>
+              </div>
+            </div>
+            <div class="dash-kpi-card">
+              <div class="dash-kpi-icon" style="background:rgba(0,200,83,.18); color:#37e28c;"><span class="material-icons">check_circle</span></div>
+              <div class="dash-kpi-body">
+                <div class="dash-kpi-label">OK</div>
+                <div class="dash-kpi-value" id="statOk">0</div>
+                <div class="dash-kpi-delta" id="deltaOk">-</div>
+              </div>
+            </div>
+            <div class="dash-kpi-card">
+              <div class="dash-kpi-icon" style="background:rgba(255,0,0,.18); color:#ff6b6b;"><span class="material-icons">cancel</span></div>
+              <div class="dash-kpi-body">
+                <div class="dash-kpi-label">NG</div>
+                <div class="dash-kpi-value" id="statNg">0</div>
+                <div class="dash-kpi-delta" id="deltaNg">-</div>
+              </div>
+            </div>
+            <div class="dash-kpi-card">
+              <div class="dash-kpi-icon" style="background:rgba(255,193,7,.18); color:#ffd43b;"><span class="material-icons">insights</span></div>
+              <div class="dash-kpi-body">
+                <div class="dash-kpi-label">FPY (Yield)</div>
+                <div class="dash-kpi-value" id="statYield">0%</div>
+                <div class="dash-kpi-delta" id="deltaYield">-</div>
+              </div>
+            </div>
+            <div class="dash-kpi-card">
+              <div class="dash-kpi-icon" style="background:rgba(155,89,255,.18); color:#b794f6;"><span class="material-icons">timer</span></div>
+              <div class="dash-kpi-body">
+                <div class="dash-kpi-label">Cycle Time (avg)</div>
+                <div class="dash-kpi-value" id="statCycleTime">-</div>
+                <div class="dash-kpi-delta">detik/part</div>
+              </div>
+            </div>
+            <div class="dash-kpi-card">
+              <div class="dash-kpi-icon" style="background:rgba(0,200,200,.18); color:#3bd6d6;"><span class="material-icons">speed</span></div>
+              <div class="dash-kpi-body">
+                <div class="dash-kpi-label">UPH (Estimasi)</div>
+                <div class="dash-kpi-value" id="statUph">-</div>
+                <div class="dash-kpi-delta">pcs/jam</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="row g-3 mt-1">
+            <div class="col-lg-8">
+              <div class="dash-card">
+                <h6 class="dash-card-title">Inspection Trend (Harian)</h6>
+                <canvas id="dailyTrendChart" height="110"></canvas>
+              </div>
+            </div>
+            <div class="col-lg-4">
+              <div class="dash-card h-100">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <h6 class="dash-card-title mb-0">Hasil Inspeksi Terakhir</h6>
+                  <span id="lastResultBadge" class="dash-badge">-</span>
+                </div>
+                <div id="lastResultEmpty" class="text-center text-muted small py-4">Belum ada data inspeksi.</div>
+                <div id="lastResultMeta" class="small d-none">
+                  <img id="lastResultImg" class="dash-last-img d-none" alt="Foto hasil inspeksi terakhir">
+                  <div id="lastResultImgLoading" class="text-center text-muted small py-3 d-none">Memuat foto...</div>
+                  <div class="dash-kv"><span>Recipe</span><b id="lastResultRecipe">-</b></div>
+                  <div class="dash-kv"><span>Waktu</span><b id="lastResultTime">-</b></div>
+                  <div class="dash-kv"><span>Cycle Time</span><b id="lastResultCycle">-</b></div>
+                  <div class="dash-kv"><span>Keterangan NG</span><b id="lastResultNgReason">-</b></div>
+                  <a id="lastResultImgLink" href="#" target="_blank" class="btn btn-sm btn-outline-light w-100 mt-2 d-none">Buka Foto Ukuran Penuh</a>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="row g-3 mt-1">
+            <div class="col-lg-3 col-md-6">
+              <div class="dash-card h-100">
+                <h6 class="dash-card-title">Result Summary</h6>
+                <canvas id="resultSummaryChart" height="150"></canvas>
+                <div class="text-center small mt-2">
+                  <div>Target FPY: <b id="dashTargetFpy">95%</b></div>
+                  <div>Achievement: <b id="dashAchievementFpy">0%</b></div>
+                </div>
+              </div>
+            </div>
+            <div class="col-lg-3 col-md-6">
+              <div class="dash-card h-100">
+                <h6 class="dash-card-title">Top 5 Defect</h6>
+                <ul id="topNgList" class="dash-defect-list"></ul>
+              </div>
+            </div>
+            <div class="col-lg-3 col-md-6">
+              <div class="dash-card h-100">
+                <h6 class="dash-card-title">Status Sistem</h6>
+                <ul class="dash-status-list">
+                  <li><span class="dash-dot dash-dot-online"></span> Database <span class="ms-auto text-success">Terhubung</span></li>
+                  <li><span class="dash-dot" id="dashModelDot"></span> Model AI <span class="ms-auto" id="dashModelStatus">Memuat...</span></li>
+                  <li><span class="dash-dot dash-dot-online"></span> Engine <span class="ms-auto">ONNX Runtime (Web)</span></li>
+                  <li><span class="dash-dot dash-dot-online"></span> User Aktif <span class="ms-auto" id="dashUserName">-</span></li>
+                </ul>
+              </div>
+            </div>
+            <div class="col-lg-3 col-md-6">
+              <div class="dash-card h-100">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <h6 class="dash-card-title mb-0">Hasil Terbaru</h6>
+                  <span class="small dash-link" onclick="showView('history')">Lihat Semua</span>
+                </div>
+                <ul id="recentResultsList" class="dash-recent-list"></ul>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 

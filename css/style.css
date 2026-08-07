@@ -7,40 +7,49 @@
   --c-secondary:#0055A4;
   --c-accent:#FF0000;
   --c-success:#00C853;
-  --c-bg:#F5F7FA;
+  --c-bg:#0b1220;
   --c-warning:#FFC107;
+  --c-text:#e6e9f2;
+  --c-text-muted:#98a2c0;
+  --c-card-bg:rgba(255,255,255,.045);
+  --c-card-border:rgba(255,255,255,.08);
   --radius-lg:16px;
   --radius-md:10px;
-  --shadow-soft:0 8px 24px rgba(0,51,102,0.08);
+  --shadow-soft:0 8px 24px rgba(0,0,0,0.35);
 }
 
 *{box-sizing:border-box;}
 body{
   margin:0;
-  background:linear-gradient(160deg,var(--c-bg) 0%,#e8edf5 100%);
+  background:linear-gradient(160deg,#0b1220 0%,#151d33 100%);
   font-family:'Segoe UI',Roboto,Arial,sans-serif;
-  color:#1a1a2e;
+  color:var(--c-text);
 }
 
 /* ---------- Glassmorphism card ---------- */
 .glass-card{
-  background:rgba(255,255,255,0.75);
+  background:var(--c-card-bg);
   backdrop-filter:blur(12px);
   -webkit-backdrop-filter:blur(12px);
-  border:1px solid rgba(255,255,255,0.5);
+  border:1px solid var(--c-card-border);
   border-radius:var(--radius-lg);
   box-shadow:var(--shadow-soft);
+  color:var(--c-text);
   transition:transform .2s ease, box-shadow .2s ease;
 }
-.glass-card:hover{ box-shadow:0 12px 32px rgba(0,51,102,0.14); }
+.glass-card:hover{ box-shadow:0 12px 32px rgba(0,0,0,.45); }
+.glass-card h5, .glass-card h6, .glass-card .form-label{ color:var(--c-text); }
+.glass-card hr{ border-color:var(--c-card-border); }
 
 /* ---------- Login Screen ---------- */
-.login-screen{ min-height:100vh; background:radial-gradient(circle at top left,var(--c-secondary),var(--c-primary)); }
+.login-screen{ min-height:100vh; background:radial-gradient(circle at top left,#0d2b4f,#050a14); }
 .login-card{ width:380px; padding:2.5rem; }
 .logo-placeholder{ width:48px; opacity:.9; }
-.brand-title{ font-weight:800; color:var(--c-primary); letter-spacing:1px; }
-.text-accent{ color:var(--c-accent); }
-.brand-tagline{ color:var(--c-secondary); font-size:.85rem; font-style:italic; }
+.brand-title{ font-weight:800; color:#fff; letter-spacing:1px; }
+.text-accent{ color:#ff6b6b; }
+.brand-tagline{ color:#7fb8ff; font-size:.85rem; font-style:italic; }
+.login-card .text-muted{ color:var(--c-text-muted) !important; }
+.login-card .form-label{ color:var(--c-text); }
 
 /* ---------- App Shell ---------- */
 .app-shell{ display:flex; min-height:100vh; }
@@ -67,22 +76,24 @@ body{
 
 .main-content{ flex:1; display:flex; flex-direction:column; min-width:0; }
 .topbar{
-  height:64px; background:#fff; display:flex; align-items:center; justify-content:space-between;
-  padding:0 1.5rem; box-shadow:0 2px 8px rgba(0,0,0,.04); position:sticky; top:0; z-index:10;
+  height:64px; background:#0f1526; display:flex; align-items:center; justify-content:space-between;
+  padding:0 1.5rem; box-shadow:0 2px 8px rgba(0,0,0,.35); border-bottom:1px solid rgba(255,255,255,.07);
+  position:sticky; top:0; z-index:10;
 }
-.topbar-title{ font-weight:700; color:var(--c-primary); font-size:1.1rem; }
+.topbar-title{ font-weight:700; color:var(--c-text); font-size:1.1rem; }
 .badge-role{ background:var(--c-secondary); color:#fff; padding:.25rem .6rem; border-radius:20px; font-size:.7rem; margin-right:.5rem; }
+#userFullName{ color:var(--c-text); }
 .content-area{ padding:1.5rem; flex:1; }
 .view{ animation:fadeIn .3s ease; }
 @keyframes fadeIn{ from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:translateY(0);} }
 
-/* ---------- Stat Cards (Dashboard) ---------- */
+/* ---------- Stat Cards (dipakai di beberapa halaman ringkasan) ---------- */
 .stat-card{ padding:1.25rem; text-align:center; }
-.stat-icon{ font-size:30px; color:var(--c-secondary); }
+.stat-icon{ font-size:30px; color:#4dabf7; }
 .stat-icon.success{ color:var(--c-success); }
-.stat-icon.danger{ color:var(--c-accent); }
-.stat-value{ font-size:1.8rem; font-weight:800; color:var(--c-primary); }
-.stat-label{ font-size:.75rem; color:#667; text-transform:uppercase; letter-spacing:.5px; }
+.stat-icon.danger{ color:#ff6b6b; }
+.stat-value{ font-size:1.8rem; font-weight:800; color:var(--c-text); }
+.stat-label{ font-size:.75rem; color:var(--c-text-muted); text-transform:uppercase; letter-spacing:.5px; }
 .chart-card{ padding:1.25rem; }
 
 /* ---------- Camera / Run Mode ---------- */
@@ -115,14 +126,141 @@ body{
 .run-decision-badge.ok{ background:var(--c-success); }
 .run-decision-badge.ng{ background:var(--c-accent); }
 .run-sidepanel{ flex:1; padding:1.25rem; }
-.run-counter{ display:flex; justify-content:space-between; padding:.5rem 0; border-bottom:1px dashed #ddd; }
+.run-counter{ display:flex; justify-content:space-between; padding:.5rem 0; border-bottom:1px dashed var(--c-card-border); }
+
+/* ---------- Dashboard (tema gelap, khusus isi halaman Dashboard -
+   sidebar/topbar TETAP tema terang seperti biasa) ---------- */
+.dash-dark{
+  background:linear-gradient(160deg,#0c1220 0%,#141b30 100%);
+  border-radius:var(--radius-lg);
+  padding:1.25rem;
+  color:#e6e9f2;
+}
+.dash-kpi-row{ display:grid; grid-template-columns:repeat(6,1fr); gap:.9rem; }
+@media (max-width:1400px){ .dash-kpi-row{ grid-template-columns:repeat(3,1fr); } }
+@media (max-width:700px){ .dash-kpi-row{ grid-template-columns:repeat(2,1fr); } }
+.dash-kpi-card{
+  background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.07);
+  border-radius:12px; padding:.9rem; display:flex; gap:.75rem; align-items:flex-start;
+}
+.dash-kpi-icon{ width:42px; height:42px; border-radius:10px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.dash-kpi-label{ font-size:.72rem; color:#98a2c0; text-transform:uppercase; letter-spacing:.4px; }
+.dash-kpi-value{ font-size:1.5rem; font-weight:800; color:#fff; line-height:1.2; }
+.dash-kpi-delta{ font-size:.7rem; color:#7c8bb5; margin-top:.15rem; }
+
+.dash-card{
+  background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.07);
+  border-radius:12px; padding:1rem; color:#e6e9f2;
+}
+.dash-card-title{ color:#e6e9f2; font-size:.85rem; font-weight:700; margin-bottom:.75rem; }
+.dash-card canvas{ max-width:100%; }
+.dash-badge{ background:rgba(255,255,255,.08); color:#cdd3ea; font-size:.7rem; padding:.25rem .6rem; border-radius:20px; }
+.dash-last-img{ width:100%; max-height:220px; object-fit:contain; background:#000; border-radius:8px; margin-bottom:.6rem; display:block; }
+.dash-kv{ display:flex; justify-content:space-between; padding:.3rem 0; border-bottom:1px dashed rgba(255,255,255,.08); color:#cdd3ea; }
+.dash-kv b{ color:#fff; font-weight:600; text-align:right; max-width:60%; }
+
+.dash-defect-list{ list-style:none; padding:0; margin:0; }
+.dash-defect-list li{ margin-bottom:.6rem; }
+.dash-defect-row{ display:flex; justify-content:space-between; font-size:.78rem; color:#cdd3ea; margin-bottom:.2rem; }
+.dash-defect-bar-bg{ background:rgba(255,255,255,.08); border-radius:6px; height:6px; overflow:hidden; }
+.dash-defect-bar-fill{ background:#ff6b6b; height:100%; border-radius:6px; }
+
+.dash-status-list{ list-style:none; padding:0; margin:0; }
+.dash-status-list li{ display:flex; align-items:center; gap:.5rem; padding:.45rem 0; border-bottom:1px dashed rgba(255,255,255,.08); font-size:.8rem; color:#cdd3ea; }
+.dash-status-list li:last-child{ border-bottom:none; }
+.dash-dot{ width:9px; height:9px; border-radius:50%; background:#666; flex-shrink:0; }
+.dash-dot-online{ background:#37e28c; box-shadow:0 0 6px #37e28c; }
+.dash-dot-offline{ background:#ff6b6b; box-shadow:0 0 6px #ff6b6b; }
+
+.dash-recent-list{ list-style:none; padding:0; margin:0; }
+.dash-recent-list li{ display:flex; justify-content:space-between; align-items:center; gap:.5rem; padding:.5rem 0; border-bottom:1px dashed rgba(255,255,255,.08); font-size:.75rem; color:#cdd3ea; }
+.dash-recent-list li:last-child{ border-bottom:none; }
+.dash-recent-decision{ font-weight:800; font-size:.7rem; padding:.15rem .5rem; border-radius:6px; }
+.dash-recent-decision.ok{ background:rgba(0,200,83,.18); color:#37e28c; }
+.dash-recent-decision.ng{ background:rgba(255,0,0,.18); color:#ff6b6b; }
+.dash-link{ color:#4dabf7; cursor:pointer; }
+.dash-link:hover{ text-decoration:underline; }
 
 /* ---------- Pipeline (AI Center) ---------- */
 .pipeline-steps{ display:flex; gap:.5rem; flex-wrap:wrap; }
-.pipeline-step{ padding:.4rem .8rem; border-radius:20px; background:#eee; font-size:.75rem; }
+.pipeline-step{ padding:.4rem .8rem; border-radius:20px; background:rgba(255,255,255,.08); color:var(--c-text-muted); font-size:.75rem; }
 .pipeline-step.active{ background:var(--c-secondary); color:#fff; font-weight:600; }
 
 .log-box{ height:180px; overflow-y:auto; background:#0d1b2a; color:#00ff9d; font-family:monospace; font-size:.75rem; padding:.5rem; border-radius:8px; }
 
 .btn-primary{ background:var(--c-secondary); border-color:var(--c-secondary); }
 .btn-primary:hover{ background:var(--c-primary); border-color:var(--c-primary); }
+
+/* ==================================================================
+   TEMA GELAP - GLOBAL (Bootstrap component overrides)
+   Semua override di bawah ini HANYA soal warna/tampilan - tidak ada
+   perubahan struktur HTML atau ID/class yang dipakai JS, jadi semua
+   fitur yang sudah jalan (form, tabel, modal, dsb.) tetap berfungsi
+   sama persis seperti sebelumnya, cuma tampilannya beda.
+   ================================================================== */
+code{ background:rgba(255,255,255,.1); color:#ffd43b; padding:.1rem .35rem; border-radius:4px; }
+
+.form-label{ color:var(--c-text); }
+.form-control, .form-select{
+  background-color:rgba(255,255,255,.06); border-color:var(--c-card-border); color:var(--c-text);
+}
+.form-control:focus, .form-select:focus{
+  background-color:rgba(255,255,255,.09); border-color:var(--c-secondary); color:var(--c-text);
+  box-shadow:0 0 0 .2rem rgba(0,85,164,.25);
+}
+.form-control::placeholder{ color:var(--c-text-muted); opacity:1; }
+.form-control:disabled, .form-select:disabled{ background-color:rgba(255,255,255,.03); color:var(--c-text-muted); }
+.form-select option{ background-color:#151b2e; color:var(--c-text); }
+.form-check-label{ color:var(--c-text); }
+.form-range{ background:transparent; }
+.form-range::-webkit-slider-runnable-track{ background:rgba(255,255,255,.12); }
+.form-range::-moz-range-track{ background:rgba(255,255,255,.12); }
+.text-muted{ color:var(--c-text-muted) !important; }
+
+/* Tabel */
+.table{ color:var(--c-text); border-color:var(--c-card-border); }
+.table > :not(caption) > * > *{ background-color:transparent; color:var(--c-text); border-bottom-color:var(--c-card-border); box-shadow:none; }
+.table-hover > tbody > tr:hover > *{ background-color:rgba(255,255,255,.05); color:var(--c-text); }
+.table thead th{ color:var(--c-text-muted); border-bottom-color:var(--c-card-border); }
+
+/* List group (Daftar ROI, Tool di ROI Terpilih, dsb.) */
+.list-group-item{
+  background-color:rgba(255,255,255,.04); color:var(--c-text); border-color:var(--c-card-border);
+}
+.list-group-item.active{ background-color:var(--c-secondary); border-color:var(--c-secondary); color:#fff; }
+.list-group-item-action:hover, .list-group-item-action:focus{ background-color:rgba(255,255,255,.08); color:var(--c-text); }
+
+/* Modal */
+.modal-content{ background-color:#151b2e; color:var(--c-text); border:1px solid var(--c-card-border); }
+.modal-header, .modal-footer{ border-color:var(--c-card-border); }
+.btn-close{ filter:invert(1) grayscale(1) brightness(1.4); }
+
+/* Accordion (dipakai di Camera Center - Pengaturan Kamera) */
+.accordion-item{ background-color:transparent; border-color:var(--c-card-border); }
+.accordion-button{
+  background-color:rgba(255,255,255,.04); color:var(--c-text);
+}
+.accordion-button:not(.collapsed){ background-color:rgba(0,85,164,.18); color:var(--c-text); box-shadow:none; }
+.accordion-button::after{ filter:invert(1) grayscale(1) brightness(1.6); }
+.accordion-button:focus{ box-shadow:0 0 0 .2rem rgba(0,85,164,.25); border-color:var(--c-secondary); }
+.accordion-body{ background-color:rgba(255,255,255,.02); color:var(--c-text); }
+
+/* Badge Bootstrap default (bg-secondary dipakai utk status "-" di Recipe Management, dll) */
+.badge.bg-secondary{ background-color:#4a5578 !important; }
+.badge.bg-success{ background-color:var(--c-success) !important; }
+.badge.bg-danger{ background-color:#ff6b6b !important; }
+
+/* Tombol outline - pertahankan keterbacaan di atas background gelap */
+.btn-outline-secondary{ color:#c3c9de; border-color:#5a6488; }
+.btn-outline-secondary:hover{ background-color:#5a6488; border-color:#5a6488; color:#fff; }
+.btn-outline-primary{ color:#6fb3ff; border-color:var(--c-secondary); }
+.btn-outline-primary:hover{ background-color:var(--c-secondary); border-color:var(--c-secondary); color:#fff; }
+.btn-outline-success:hover{ color:#fff; }
+.btn-outline-danger:hover{ color:#fff; }
+.btn-check + .btn-outline-primary{ color:#6fb3ff; border-color:var(--c-secondary); }
+.btn-check:checked + .btn-outline-primary{ background-color:var(--c-secondary); border-color:var(--c-secondary); color:#fff; }
+
+/* Dropdown menu (kalau ada, mis. notifikasi/topbar) */
+.dropdown-menu{ background-color:#151b2e; border-color:var(--c-card-border); }
+.dropdown-item{ color:var(--c-text); }
+.dropdown-item:hover, .dropdown-item:focus{ background-color:rgba(255,255,255,.08); color:var(--c-text); }

@@ -99,6 +99,9 @@ function showView(viewName) {
   if (_currentViewName === 'run' && viewName !== 'run' && typeof stopRunMode === 'function') {
     stopRunMode();
   }
+  if (_currentViewName === 'dashboard' && viewName !== 'dashboard') {
+    stopDashboardPolling();
+  }
   _currentViewName = viewName;
 
   document.querySelectorAll('.view').forEach(function (v) { v.classList.add('d-none'); });
@@ -118,38 +121,222 @@ function showView(viewName) {
 
 /* ---------------- DASHBOARD ---------------- */
 let dailyTrendChartInstance = null;
+let resultSummaryChartInstance = null;
+const DASH_TARGET_FPY = 95; // target FPY statis - sesuaikan kalau perlu dibuat configurable dari Settings nanti
 
 function loadDashboard() {
   callApi('apiGetDashboardStats', [{}, CURRENT_SESSION]).then(function (res) {
     if (!res.success) { console.warn('Gagal memuat dashboard:', res.error); return; }
-    document.getElementById('statProdToday').innerText = res.productionToday;
+
+    document.getElementById('statProdToday').innerText = res.totalInspections;
     document.getElementById('statOk').innerText = res.okCount;
     document.getElementById('statNg').innerText = res.ngCount;
     document.getElementById('statYield').innerText = res.yieldPct + '%';
+    document.getElementById('statCycleTime').innerText = res.avgCycleTimeMs ? (res.avgCycleTimeMs / 1000).toFixed(2) + 's' : '-';
+    document.getElementById('statUph').innerText = res.avgCycleTimeMs ? Math.round(3600000 / res.avgCycleTimeMs) : '-';
 
+    // Delta dibandingkan dengan hari sebelumnya, dihitung dari 2 entri terakhir
+    // dailyTrend (bukan simulasi - kalau datanya belum cukup 2 hari, tampilkan "-").
+    _renderDashDeltas(res.dailyTrend);
+
+    // ---- Top 5 Defect (bar list dengan persentase dari total NG) ----
     const topNgList = document.getElementById('topNgList');
     topNgList.innerHTML = '';
-    res.topNg.forEach(function (item) {
+    const ngTotal = res.ngCount || 1;
+    (res.topNg || []).slice(0, 5).forEach(function (item) {
+      const pct = Math.round((item.count / ngTotal) * 100);
       const li = document.createElement('li');
-      li.className = 'd-flex justify-content-between border-bottom py-1';
-      li.innerHTML = '<span>' + item.reason + '</span><strong>' + item.count + '</strong>';
+      li.innerHTML =
+        '<div class="dash-defect-row"><span>' + item.reason + '</span><span>' + item.count + ' (' + pct + '%)</span></div>' +
+        '<div class="dash-defect-bar-bg"><div class="dash-defect-bar-fill" style="width:' + pct + '%;"></div></div>';
       topNgList.appendChild(li);
     });
+    if (!(res.topNg || []).length) {
+      topNgList.innerHTML = '<li class="text-muted small">Belum ada data NG.</li>';
+    }
 
+    // ---- Inspection Trend (bar OK/NG + garis FPY%) ----
     const ctx = document.getElementById('dailyTrendChart');
     if (dailyTrendChartInstance) dailyTrendChartInstance.destroy();
+    const fpySeries = res.dailyTrend.map(function (d) {
+      const total = d.ok + d.ng;
+      return total > 0 ? Math.round((d.ok / total) * 1000) / 10 : null;
+    });
     dailyTrendChartInstance = new Chart(ctx, {
       type: 'bar',
       data: {
         labels: res.dailyTrend.map(function (d) { return d.date; }),
         datasets: [
-          { label: 'OK', data: res.dailyTrend.map(function (d) { return d.ok; }), backgroundColor: '#00C853' },
-          { label: 'NG', data: res.dailyTrend.map(function (d) { return d.ng; }), backgroundColor: '#FF0000' }
+          { type: 'bar', label: 'OK', data: res.dailyTrend.map(function (d) { return d.ok; }), backgroundColor: '#37e28c', yAxisID: 'y' },
+          { type: 'bar', label: 'NG', data: res.dailyTrend.map(function (d) { return d.ng; }), backgroundColor: '#ff6b6b', yAxisID: 'y' },
+          { type: 'line', label: 'FPY (%)', data: fpySeries, borderColor: '#4dabf7', backgroundColor: '#4dabf7', yAxisID: 'y1', tension: .3 }
         ]
       },
-      options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+      options: {
+        responsive: true,
+        interaction: { mode: 'index', intersect: false },
+        plugins: { legend: { position: 'bottom', labels: { color: '#cdd3ea' } } },
+        scales: {
+          x: { ticks: { color: '#98a2c0' }, grid: { color: 'rgba(255,255,255,.06)' } },
+          y: { position: 'left', ticks: { color: '#98a2c0' }, grid: { color: 'rgba(255,255,255,.06)' } },
+          y1: { position: 'right', min: 0, max: 100, ticks: { color: '#98a2c0' }, grid: { display: false } }
+        }
+      }
     });
+
+    // ---- Result Summary (donut OK vs NG) ----
+    const rctx = document.getElementById('resultSummaryChart');
+    if (resultSummaryChartInstance) resultSummaryChartInstance.destroy();
+    resultSummaryChartInstance = new Chart(rctx, {
+      type: 'doughnut',
+      data: {
+        labels: ['OK', 'NG'],
+        datasets: [{ data: [res.okCount, res.ngCount], backgroundColor: ['#37e28c', '#ff6b6b'], borderWidth: 0 }]
+      },
+      options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { color: '#cdd3ea' } } } }
+    });
+    document.getElementById('dashTargetFpy').innerText = DASH_TARGET_FPY + '%';
+    document.getElementById('dashAchievementFpy').innerText = res.yieldPct + '%';
+
+    // ---- Hasil Inspeksi Terakhir ----
+    _renderDashLastResult(res.lastResult);
+
+    // ---- Hasil Terbaru (5 item) ----
+    const recentList = document.getElementById('recentResultsList');
+    recentList.innerHTML = '';
+    (res.recentResults || []).forEach(function (r) {
+      const li = document.createElement('li');
+      const timeStr = r.timestamp ? new Date(r.timestamp).toLocaleString('id-ID', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }) : '-';
+      li.innerHTML =
+        '<span class="dash-recent-decision ' + (r.decision === 'OK' ? 'ok' : 'ng') + '">' + r.decision + '</span>' +
+        '<span class="flex-fill mx-2 text-truncate">' + (r.recipeName || '-') + '</span>' +
+        '<span class="text-muted">' + timeStr + '</span>';
+      recentList.appendChild(li);
+    });
+    if (!(res.recentResults || []).length) {
+      recentList.innerHTML = '<li class="text-muted small">Belum ada data.</li>';
+    }
   }).catch(function (err) { console.warn('Gagal memuat dashboard:', err.message); });
+
+  // ---- Status Sistem: Model AI aktif (data asli dari AI Detection Center, bukan simulasi) ----
+  callApi('apiGetActiveAiModel', ['detection', CURRENT_SESSION]).then(function (res) {
+    const dot = document.getElementById('dashModelDot');
+    const statusEl = document.getElementById('dashModelStatus');
+    if (res.success && res.model) {
+      dot.classList.add('dash-dot-online');
+      statusEl.innerText = res.model.name ? (res.model.name + ' (aktif)') : 'Aktif';
+    } else {
+      dot.classList.add('dash-dot-offline');
+      statusEl.innerText = 'Belum ada model aktif';
+    }
+  }).catch(function () {
+    document.getElementById('dashModelStatus').innerText = 'Gagal memuat';
+  });
+
+  const userNameEl = document.getElementById('dashUserName');
+  if (userNameEl) userNameEl.innerText = (CURRENT_USER && CURRENT_USER.fullName) ? CURRENT_USER.fullName : '-';
+
+  startDashboardPolling();
+}
+
+function _renderDashDeltas(dailyTrend) {
+  const ids = { total: 'deltaTotal', ok: 'deltaOk', ng: 'deltaNg', yield: 'deltaYield' };
+  if (!dailyTrend || dailyTrend.length < 2) {
+    Object.values(ids).forEach(function (id) { document.getElementById(id).innerText = 'vs hari sblm: data blm cukup'; });
+    return;
+  }
+  const today = dailyTrend[dailyTrend.length - 1];
+  const prev = dailyTrend[dailyTrend.length - 2];
+  const todayTotal = today.ok + today.ng, prevTotal = prev.ok + prev.ng;
+  const todayFpy = todayTotal ? (today.ok / todayTotal * 100) : 0;
+  const prevFpy = prevTotal ? (prev.ok / prevTotal * 100) : 0;
+
+  function fmt(id, delta, suffix) {
+    suffix = suffix || '';
+    const sign = delta > 0 ? '+' : '';
+    const el = document.getElementById(id);
+    el.innerText = sign + delta.toFixed(1) + suffix + ' vs hari sblm';
+    el.style.color = delta > 0 ? '#37e28c' : (delta < 0 ? '#ff6b6b' : '#7c8bb5');
+  }
+  fmt(ids.total, todayTotal - prevTotal);
+  fmt(ids.ok, today.ok - prev.ok);
+  fmt(ids.ng, today.ng - prev.ng);
+  fmt(ids.yield, todayFpy - prevFpy, '%');
+}
+
+// Simpan fileId foto yang gambarnya SEDANG ditampilkan, supaya polling
+// tiap beberapa detik tidak berulang kali minta ulang gambar yang sama
+// ke Drive (baru fetch ulang kalau memang ada hasil baru/fileId berubah).
+let _lastDashImageFileId = null;
+
+function _renderDashLastResult(last) {
+  const empty = document.getElementById('lastResultEmpty');
+  const meta = document.getElementById('lastResultMeta');
+  const badge = document.getElementById('lastResultBadge');
+  if (!last) {
+    empty.classList.remove('d-none');
+    meta.classList.add('d-none');
+    badge.innerText = '-';
+    return;
+  }
+  empty.classList.add('d-none');
+  meta.classList.remove('d-none');
+  badge.innerText = last.decision;
+  badge.style.background = last.decision === 'OK' ? 'rgba(0,200,83,.25)' : 'rgba(255,0,0,.25)';
+  badge.style.color = last.decision === 'OK' ? '#37e28c' : '#ff6b6b';
+  document.getElementById('lastResultRecipe').innerText = last.recipeName || '-';
+  document.getElementById('lastResultTime').innerText = last.timestamp ? new Date(last.timestamp).toLocaleString('id-ID') : '-';
+  document.getElementById('lastResultCycle').innerText = last.cycleTimeMs ? (last.cycleTimeMs / 1000).toFixed(2) + 's' : '-';
+  document.getElementById('lastResultNgReason').innerText = last.ngReasonType || '-';
+  const imgLink = document.getElementById('lastResultImgLink');
+  if (last.imagePath) {
+    imgLink.href = last.imagePath;
+    imgLink.classList.remove('d-none');
+  } else {
+    imgLink.classList.add('d-none');
+  }
+
+  // Foto berganti mengikuti hasil cycle inspeksi terbaru (bukan live stream
+  // kamera - ini snapshot hasil inspeksi yang benar-benar tersimpan di
+  // Drive), otomatis ter-refresh tiap kali loadDashboard() dipanggil ulang
+  // lewat polling di bawah.
+  const img = document.getElementById('lastResultImg');
+  const loading = document.getElementById('lastResultImgLoading');
+  if (!last.imageFileId) {
+    img.classList.add('d-none');
+    loading.classList.add('d-none');
+    _lastDashImageFileId = null;
+    return;
+  }
+  if (last.imageFileId === _lastDashImageFileId) return; // gambar sama, tidak perlu fetch ulang
+
+  _lastDashImageFileId = last.imageFileId;
+  img.classList.add('d-none');
+  loading.classList.remove('d-none');
+  callApi('apiGetDriveImageBase64', [last.imageFileId, CURRENT_SESSION]).then(function (res) {
+    loading.classList.add('d-none');
+    if (res.success) {
+      img.src = res.dataUri;
+      img.classList.remove('d-none');
+    }
+  }).catch(function () { loading.classList.add('d-none'); });
+}
+
+/* Auto-refresh Dashboard tiap beberapa detik supaya kartu "Hasil Inspeksi
+   Terakhir" & "Hasil Terbaru" ikut berganti mengikuti cycle proses inspeksi
+   yang baru masuk (dari Run Mode), tanpa pengguna harus manual refresh
+   halaman. Dihentikan otomatis saat pindah dari menu Dashboard supaya tidak
+   terus polling di belakang layar. */
+let dashboardPollIntervalId = null;
+const DASHBOARD_POLL_INTERVAL_MS = 5000;
+
+function startDashboardPolling() {
+  stopDashboardPolling();
+  dashboardPollIntervalId = setInterval(loadDashboard, DASHBOARD_POLL_INTERVAL_MS);
+}
+
+function stopDashboardPolling() {
+  if (dashboardPollIntervalId) { clearInterval(dashboardPollIntervalId); dashboardPollIntervalId = null; }
 }
 
 /* ---------------- RECIPE MANAGEMENT ---------------- */
