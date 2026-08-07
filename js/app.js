@@ -84,8 +84,38 @@ function bindNav() {
       li.classList.add('active');
       const view = li.getAttribute('data-view');
       showView(view);
+      closeMobileSidebar(); // di layar HP, sidebar otomatis tertutup setelah pilih menu
     });
   });
+
+  bindMobileSidebarToggle();
+}
+
+/**
+ * Sidebar di layar sempit (HP) disembunyikan off-canvas via CSS
+ * (lihat @media max-width:900px di style.css) dan dibuka/ditutup lewat
+ * tombol hamburger di topbar + backdrop gelap di belakangnya. Di layar
+ * besar (laptop/tablet lanskap) CSS ini tidak aktif jadi tombol toggle
+ * ini tidak berpengaruh (sidebar selalu tampil seperti biasa).
+ */
+function bindMobileSidebarToggle() {
+  const toggleBtn = document.getElementById('navToggleBtn');
+  const sidebar = document.getElementById('sidebarNav');
+  const backdrop = document.getElementById('sidebarBackdrop');
+  if (!toggleBtn || !sidebar || !backdrop) return;
+
+  toggleBtn.addEventListener('click', function () {
+    sidebar.classList.toggle('open');
+    backdrop.classList.toggle('show');
+  });
+  backdrop.addEventListener('click', closeMobileSidebar);
+}
+
+function closeMobileSidebar() {
+  const sidebar = document.getElementById('sidebarNav');
+  const backdrop = document.getElementById('sidebarBackdrop');
+  if (sidebar) sidebar.classList.remove('open');
+  if (backdrop) backdrop.classList.remove('show');
 }
 
 let _currentViewName = null;

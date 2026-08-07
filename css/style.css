@@ -78,9 +78,22 @@ body{
 .topbar{
   height:64px; background:#0f1526; display:flex; align-items:center; justify-content:space-between;
   padding:0 1.5rem; box-shadow:0 2px 8px rgba(0,0,0,.35); border-bottom:1px solid rgba(255,255,255,.07);
-  position:sticky; top:0; z-index:10;
+  position:sticky; top:0; z-index:10; gap:.75rem;
 }
-.topbar-title{ font-weight:700; color:var(--c-text); font-size:1.1rem; }
+.topbar-title{ font-weight:700; color:var(--c-text); font-size:1.1rem; margin-right:auto; }
+/* Tombol hamburger - hanya tampil di layar sempit (lihat @media mobile
+   di bawah); di layar besar sidebar selalu tampil jadi tombol ini
+   disembunyikan supaya tidak makan tempat di topbar. */
+.nav-toggle-btn{
+  display:none; background:none; border:none; color:var(--c-text); font-size:0; padding:.4rem;
+  border-radius:8px; cursor:pointer; line-height:0; flex-shrink:0;
+}
+.nav-toggle-btn .material-icons{ font-size:24px; }
+.nav-toggle-btn:hover{ background:rgba(255,255,255,.08); }
+.sidebar-backdrop{
+  display:none; position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:1040;
+}
+.sidebar-backdrop.show{ display:block; }
 .badge-role{ background:var(--c-secondary); color:#fff; padding:.25rem .6rem; border-radius:20px; font-size:.7rem; margin-right:.5rem; }
 #userFullName{ color:var(--c-text); }
 .content-area{ padding:1.5rem; flex:1; }
@@ -274,3 +287,57 @@ code{ background:rgba(255,255,255,.1); color:#ffd43b; padding:.1rem .35rem; bord
 .dropdown-menu{ background-color:#151b2e; border-color:var(--c-card-border); }
 .dropdown-item{ color:var(--c-text); }
 .dropdown-item:hover, .dropdown-item:focus{ background-color:rgba(255,255,255,.08); color:var(--c-text); }
+
+/* ==================================================================
+   TAMPILAN MOBILE / HP (max-width:900px)
+   ==================================================================
+   Sebelumnya sidebar 260px fixed selalu ikut ambil tempat di samping
+   konten (.app-shell{display:flex}), sehingga di layar HP (mis. 360-
+   414px lebar) konten utama tersisa hampir tidak ada ruang & semua
+   layout jadi berantakan/kepotong. Solusi: di bawah 900px, sidebar
+   diubah jadi "off-canvas" (posisi fixed, disembunyikan ke luar layar
+   kiri secara default) dan baru muncul saat tombol hamburger di
+   topbar (#navToggleBtn) diklik, dengan backdrop gelap di
+   belakangnya. CSS-only untuk struktur; toggle-nya di app.js
+   (bindMobileSidebarToggle/closeMobileSidebar) - TIDAK mengubah
+   struktur/ID/JS halaman lain, jadi fitur desktop yang sudah jalan
+   tetap aman.
+   ================================================================== */
+@media (max-width:900px){
+  .nav-toggle-btn{ display:inline-flex; align-items:center; justify-content:center; }
+
+  .sidebar{
+    position:fixed; top:0; bottom:0; left:-280px; width:260px; z-index:1050;
+    transition:left .25s ease; box-shadow:6px 0 24px rgba(0,0,0,.5);
+  }
+  .sidebar.open{ left:0; }
+
+  .topbar{ padding:0 1rem; height:56px; }
+  .topbar-title{ font-size:1rem; }
+  #userFullName{ display:none; } /* nama lengkap disembunyikan di HP supaya topbar tidak sesak, badge role tetap tampil */
+  .content-area{ padding:.85rem; }
+
+  /* Run Mode: preview kamera + panel kontrol yang tadinya berdampingan
+     (flex row) ditumpuk vertikal supaya keduanya tetap cukup lebar
+     untuk dibaca/dioperasikan di layar sempit. */
+  .run-mode-wrapper{ flex-direction:column; }
+  .run-preview{ min-height:auto; }
+  .run-sidepanel{ padding:1rem; }
+
+  .dash-dark{ padding:.85rem; }
+  .dash-kpi-row{ grid-template-columns:repeat(2,1fr); gap:.6rem; }
+
+  /* Tombol-tombol aksi (mis. toolbar ROI Editor: Ambil dari Kamera /
+     Test Images / Upload Device) yang tadinya sebaris supaya tidak
+     saling menghimpit dan tetap mudah ditekan jari. */
+  .roi-canvas-card .d-flex.flex-wrap{ gap:.5rem; }
+  .roi-canvas-card .btn-sm{ font-size:.78rem; }
+
+  .login-card{ width:92vw; padding:1.75rem; }
+}
+
+@media (max-width:480px){
+  .dash-kpi-row{ grid-template-columns:1fr 1fr; }
+  .stat-value{ font-size:1.4rem; }
+  .run-decision-badge{ font-size:1rem; padding:.5rem 1rem; top:.75rem; right:.75rem; }
+}

@@ -43,8 +43,11 @@
 
 <div id="appShell" class="app-shell d-none">
 
+  <!-- Backdrop untuk sidebar mobile (klik di luar sidebar = tutup menu) -->
+  <div id="sidebarBackdrop" class="sidebar-backdrop"></div>
+
   <!-- SIDEBAR -->
-  <nav class="sidebar">
+  <nav class="sidebar" id="sidebarNav">
     <div class="sidebar-brand">
       <span class="material-icons brand-icon">visibility</span>
       <div>
@@ -73,6 +76,7 @@
   <!-- MAIN CONTENT -->
   <div class="main-content">
     <header class="topbar">
+      <button id="navToggleBtn" class="nav-toggle-btn" aria-label="Buka menu"><span class="material-icons">menu</span></button>
       <div class="topbar-title" id="viewTitle">Dashboard</div>
       <div class="topbar-user">
         <span class="badge-role" id="userRoleBadge">Operator</span>
@@ -388,12 +392,14 @@
               <div class="d-flex gap-2 align-items-center mb-2 flex-wrap">
                 <button id="btnRoiCaptureCamera" class="btn btn-sm btn-primary"><span class="material-icons align-middle" style="font-size:16px;">photo_camera</span> Ambil Gambar dari Kamera</button>
                 <button id="btnRoiOpenTestImage" class="btn btn-sm btn-outline-primary"><span class="material-icons align-middle" style="font-size:16px;">folder_open</span> Buka dari Test Images</button>
+                <button id="btnRoiUploadDevice" class="btn btn-sm btn-outline-primary"><span class="material-icons align-middle" style="font-size:16px;">upload_file</span> Upload dari Device</button>
+                <input type="file" id="roiUploadDeviceInput" accept="image/*" class="d-none">
                 <span id="roiCaptureStatus" class="small text-muted"></span>
               </div>
               <div id="roiEmptyState" class="text-center text-muted py-5">
                 <span class="material-icons" style="font-size:48px; opacity:.4;">image</span>
                 <p class="mb-0 mt-2">Belum ada gambar referensi untuk digambar ROI-nya.</p>
-                <p class="small mb-0">Klik "Ambil Gambar dari Kamera" di atas, atau buka Camera Center/Run Mode dulu supaya ada frame kamera yang bisa dipakai di sini.</p>
+                <p class="small mb-0">Klik "Ambil Gambar dari Kamera", "Buka dari Test Images", atau "Upload dari Device" (foto dari laptop/HP Anda) di atas untuk mulai.</p>
               </div>
               <video id="roiCaptureVideo" class="d-none" autoplay playsinline muted></video>
               <canvas id="roiCanvas" class="d-none"></canvas>
