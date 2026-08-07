@@ -100,8 +100,19 @@
         <div class="row g-3">
           <div class="col-md-8">
             <div class="camera-preview-card glass-card">
-              <video id="cameraPreview" autoplay playsinline muted></video>
-              <canvas id="cameraOverlay"></canvas>
+              <div id="cameraZoomWrapper">
+                <video id="cameraPreview" autoplay playsinline muted></video>
+                <img id="frozenFrameImg" class="d-none" style="width:100%; border-radius:var(--radius-md); display:block;">
+                <img id="referenceGhostImg" class="d-none">
+                <canvas id="cameraOverlay"></canvas>
+              </div>
+              <div id="frozenFrameBadge" class="run-decision-badge d-none" style="background:#FFC107; color:#1a1a2e;">FROZEN</div>
+              <div id="cameraInfoBadge" class="camera-info-badge">-- FPS &middot; -- x --</div>
+            </div>
+            <div class="glass-card p-3 mt-3">
+              <h6>Histogram Kecerahan (live)</h6>
+              <canvas id="histogramCanvas" width="400" height="70" style="width:100%; height:70px; background:#0d1b2a; border-radius:8px;"></canvas>
+              <p class="small text-muted mb-0 mt-1">Puncak grafik menumpuk di kiri = gambar terlalu gelap (under-exposed); menumpuk di kanan = terlalu terang (over-exposed). Idealnya sebaran merata di tengah.</p>
             </div>
           </div>
           <div class="col-md-4">
@@ -125,10 +136,29 @@
                 <button id="btnSetCameraAdjust" class="btn btn-sm btn-outline-primary flex-fill">Set (Simpan sebagai Default)</button>
                 <button id="btnResetCameraAdjust" class="btn btn-sm btn-outline-secondary flex-fill">Reset</button>
               </div>
-              <div class="d-grid gap-2 mt-1">
+              <label class="form-label small d-flex justify-content-between">Digital Zoom <span id="zoomValue" class="text-muted">100%</span></label>
+              <input type="range" id="zoomRange" class="form-range mb-2" min="100" max="300" value="100">
+              <div class="form-check mb-2">
+                <input type="checkbox" id="gridOverlayToggle" class="form-check-input">
+                <label class="form-check-label small" for="gridOverlayToggle">Tampilkan Grid &amp; Crosshair</label>
+              </div>
+              <div class="form-check mb-1">
+                <input type="checkbox" id="referenceGhostToggle" class="form-check-input" disabled>
+                <label class="form-check-label small" for="referenceGhostToggle">Bandingkan dengan Gambar Referensi</label>
+              </div>
+              <p class="small text-muted mb-2">Area yang HITAM = posisi part sama seperti referensi (sejajar). Area yang berwarna terang = ada perbedaan/pergeseran posisi.</p>
+              <div class="d-flex gap-2 mb-3">
+                <button id="btnSaveReference" class="btn btn-sm btn-outline-primary flex-fill">Simpan Frame Saat Ini sbg Referensi</button>
+                <button id="btnClearReference" class="btn btn-sm btn-outline-secondary" disabled>Hapus</button>
+              </div>
+              <div class="d-grid gap-2 mt-1" id="cameraLiveControls">
                 <button id="btnCapture" class="btn btn-primary"><span class="material-icons align-middle">photo_camera</span> Single Shot</button>
                 <button id="btnContinuous" class="btn btn-outline-secondary">Continuous Monitoring</button>
                 <button id="btnStopCamera" class="btn btn-outline-danger">Matikan Kamera</button>
+              </div>
+              <div class="d-grid gap-2 mt-1 d-none" id="cameraFrozenControls">
+                <button id="btnSaveFrozenFrame" class="btn btn-success"><span class="material-icons align-middle">save</span> Simpan Frame Ini</button>
+                <button id="btnResumeLive" class="btn btn-outline-secondary">Lanjutkan Monitoring (Batal)</button>
               </div>
               <p class="small text-muted mt-2 mb-0" id="cameraStatusText">Kamera aktif.</p>
             </div>

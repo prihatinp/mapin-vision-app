@@ -86,9 +86,24 @@ body{
 .chart-card{ padding:1.25rem; }
 
 /* ---------- Camera / Run Mode ---------- */
-.camera-preview-card, .roi-canvas-card{ position:relative; padding:.5rem; }
+.camera-preview-card, .roi-canvas-card{ position:relative; padding:.5rem; overflow:hidden; }
 .camera-preview-card video{ width:100%; border-radius:var(--radius-md); background:#000; }
 #cameraOverlay, #roiCanvas, #runOverlay{ position:absolute; top:.5rem; left:.5rem; pointer-events:none; }
+
+/* Wrapper yang di-scale untuk fitur Digital Zoom - video, canvas overlay,
+   dan gambar referensi/frozen SEMUA ada di dalamnya supaya ikut ter-zoom
+   sebagai satu kesatuan gambar yang sinkron. */
+#cameraZoomWrapper{ transform-origin:center center; transition:transform .1s ease-out; }
+#cameraZoomWrapper #cameraOverlay{ top:0; left:0; }
+#referenceGhostImg{
+  position:absolute; top:0; left:0; width:100%; border-radius:var(--radius-md);
+  pointer-events:none; mix-blend-mode:difference;
+}
+.camera-info-badge{
+  position:absolute; top:1.5rem; left:1.5rem; padding:.3rem .7rem; border-radius:8px;
+  font-size:.75rem; font-weight:600; background:rgba(0,0,0,.55); color:#0f0;
+  font-family:monospace; pointer-events:none;
+}
 
 .run-mode-wrapper{ display:flex; gap:1rem; }
 .run-preview{ flex:3; position:relative; padding:.5rem; min-height:70vh; display:flex; align-items:center; justify-content:center; }
