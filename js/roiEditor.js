@@ -583,31 +583,55 @@ function redrawCanvas() {
   });
 }
 
+/**
+ * Konversi posisi klik mouse (koordinat CSS/layar, karena #roiCanvas
+ * sekarang di-scale via CSS width:100% supaya sama seperti monitor Camera
+ * Center - lihat style.css) balik ke koordinat PIKSEL ASLI kanvas (tempat
+ * roi.points sebenarnya disimpan/digambar). Tanpa ini, titik ROI akan
+ * meleset dari posisi klik begitu kanvas ditampilkan mengecil dari ukuran
+ * aslinya (mis. gambar 1920x1080 ditampilkan lebar 800px di layar).
+ */
+function _getCanvasPoint(e) {
+  const canvas = e.target;
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  return {
+    x: (e.clientX - rect.left) * scaleX,
+    y: (e.clientY - rect.top) * scaleY
+  };
+}
+
 function onCanvasMouseDown(e) {
   if (selectedRoiIndex === -1) return;
-  const rect = e.target.getBoundingClientRect();
-  const x = e.clientX - rect.left, y = e.clientY - rect.top;
+  const p0 = _getCanvasPoint(e);
   const roi = roiList[selectedRoiIndex];
 
+  // Toleransi jangkauan klik dijaga tetap ~8 piksel LAYAR (bukan piksel
+  // kanvas asli) supaya titik ROI tetap mudah diklik walau gambar aslinya
+  // besar dan ditampilkan mengecil (mis. 1920px ditampilkan di layar 800px).
+  const canvas = e.target;
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const hitToleranceCanvasPx = 8 * scaleX;
+
   draggingPointIndex = roi.points.findIndex(function (p) {
-    return Math.hypot(p.x - x, p.y - y) < 8;
+    return Math.hypot(p.x - p0.x, p.y - p0.y) < hitToleranceCanvasPx;
   });
 }
 
 function onCanvasMouseMove(e) {
   if (draggingPointIndex === -1 || selectedRoiIndex === -1) return;
-  const rect = e.target.getBoundingClientRect();
-  const x = e.clientX - rect.left, y = e.clientY - rect.top;
-  roiList[selectedRoiIndex].points[draggingPointIndex] = { x: x, y: y };
+  const p = _getCanvasPoint(e);
+  roiList[selectedRoiIndex].points[draggingPointIndex] = p;
   redrawCanvas();
 }
 
 /** Double-click di dalam polygon = tambah titik baru di tengah edge terdekat */
 function onCanvasDoubleClick(e) {
   if (selectedRoiIndex === -1) return;
-  const rect = e.target.getBoundingClientRect();
-  const x = e.clientX - rect.left, y = e.clientY - rect.top;
+  const p = _getCanvasPoint(e);
   const roi = roiList[selectedRoiIndex];
-  roi.points.push({ x: x, y: y });
+  roi.points.push(p);
   redrawCanvas();
 }

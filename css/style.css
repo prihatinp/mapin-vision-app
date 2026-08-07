@@ -99,7 +99,17 @@ body{
 /* ---------- Camera / Run Mode ---------- */
 .camera-preview-card, .roi-canvas-card{ position:relative; padding:.5rem; overflow:hidden; }
 .camera-preview-card video{ width:100%; border-radius:var(--radius-md); background:#000; }
-#cameraOverlay, #roiCanvas, #runOverlay{ position:absolute; top:.5rem; left:.5rem; pointer-events:none; }
+#cameraOverlay, #runOverlay{ position:absolute; top:.5rem; left:.5rem; pointer-events:none; }
+
+/* Kanvas ROI Editor SEBELUMNYA dirender di ukuran piksel ASLI gambar
+   (mis. 1920x1080) tanpa mengecil menyesuaikan lebar kartu, sehingga
+   gambar overflow lalu terpotong oleh overflow:hidden pada
+   .roi-canvas-card - beda dengan video Camera Center yang sudah
+   width:100% dari awal. Disamakan di sini: kanvas ikut mengecil mengisi
+   lebar kartu (aspek rasio tetap terjaga via height:auto), sama seperti
+   monitor Camera Center. Titik ROI tetap presisi karena koordinat mouse
+   di roiEditor.js dikonversi balik ke skala piksel asli kanvas. */
+#roiCanvas{ width:100%; height:auto; display:block; border-radius:var(--radius-md); background:#000; }
 
 /* Wrapper yang di-scale untuk fitur Digital Zoom - video, canvas overlay,
    dan gambar referensi/frozen SEMUA ada di dalamnya supaya ikut ter-zoom
