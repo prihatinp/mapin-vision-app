@@ -110,6 +110,48 @@
               <div id="frozenFrameBadge" class="run-decision-badge d-none" style="background:#FFC107; color:#1a1a2e;">FROZEN</div>
               <div id="cameraInfoBadge" class="camera-info-badge">-- FPS &middot; -- x --</div>
             </div>
+
+            <!-- Panel Aksi Simpan - 2 tujuan simpan yang SENGAJA dipisah & diberi warna
+                 berbeda supaya tidak tertukar: TEST (biru, tanpa label, folder Test Images)
+                 vs DATASET AI (hijau, wajib pilih label, folder Dataset/<label>). -->
+            <div class="row g-3 mt-1">
+              <div class="col-md-6">
+                <div class="glass-card p-3 h-100" style="border:2px solid #0055A4;">
+                  <span class="badge mb-2" style="background:#0055A4;">MODE TEST &middot; Cek Kamera</span>
+                  <p class="small text-muted mb-2">Simpan frame yang sedang dibekukan (Single Shot) untuk cek fokus/pencahayaan/framing. Tanpa label, tersimpan ke <code>Drive/Test Images/</code>. <b>Tidak</b> dipakai untuk training AI.</p>
+                  <div class="d-grid gap-2 mt-1 d-none" id="cameraFrozenControls">
+                    <button id="btnSaveFrozenFrame" class="btn btn-primary"><span class="material-icons align-middle">save</span> Simpan Frame Ini (Test)</button>
+                    <button id="btnResumeLive" class="btn btn-outline-secondary">Lanjutkan Monitoring (Batal)</button>
+                  </div>
+                  <p class="small text-muted mb-0" id="cameraFrozenControlsHint">Klik "Single Shot" dulu di panel kamera (kanan) untuk membekukan frame, baru tombol Simpan di sini aktif.</p>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="glass-card p-3 h-100" style="border:2px solid var(--c-success);">
+                  <span class="badge mb-2" style="background:var(--c-success);">MODE DATASET AI &middot; Labeling</span>
+                  <p class="small text-muted mb-2">Ambil foto part (OK/NG) SEBELUM recipe/AI model dibuat, sebagai bahan data yang nanti diberi label bounding box di Roboflow/CVAT. Kalau ada frame yang sedang dibekukan, sample diambil dari frame itu; kalau tidak, diambil langsung dari kamera live.</p>
+                  <label class="form-label small">Label</label>
+                  <select id="datasetLabelSelect" class="form-select form-select-sm mb-2">
+                    <option value="OK">OK (Part Normal)</option>
+                    <option value="NG_scratch">NG - Scratch (Goresan)</option>
+                    <option value="NG_karat">NG - Karat</option>
+                    <option value="NG_dent">NG - Penyok (Dent)</option>
+                    <option value="NG_crack">NG - Retak (Crack)</option>
+                    <option value="NG_missing_part">NG - Bagian Hilang</option>
+                    <option value="NG_dirty_surface">NG - Kotor</option>
+                    <option value="NG_wrong_assembly">NG - Salah Rakit</option>
+                    <option value="NG_lainnya">NG - Lainnya (isi manual)</option>
+                  </select>
+                  <input type="text" id="datasetCustomLabel" class="form-control form-control-sm mb-2 d-none" placeholder="Label manual, mis. NG_baret_dalam">
+                  <div class="d-grid">
+                    <button id="btnCaptureDataset" class="btn btn-sm btn-success">Ambil &amp; Simpan Sample</button>
+                  </div>
+                  <div id="datasetCaptureStatus" class="small mt-2"></div>
+                  <div id="datasetCaptureCounter" class="small text-muted mt-1"></div>
+                </div>
+              </div>
+            </div>
+
             <div class="glass-card p-3 mt-3">
               <h6>Histogram Kecerahan (live)</h6>
               <canvas id="histogramCanvas" width="400" height="70" style="width:100%; height:70px; background:#0d1b2a; border-radius:8px;"></canvas>
@@ -117,8 +159,8 @@
             </div>
           </div>
           <div class="col-md-4">
-            <div class="glass-card p-3">
-              <h6>Pengaturan Kamera</h6>
+            <div class="glass-card p-3 mb-3">
+              <h6>Kamera</h6>
               <label class="form-label small">Tipe Kamera</label>
               <div class="btn-group w-100 mb-2" role="group" id="cameraTypeRadios">
                 <input type="radio" class="btn-check" name="cameraTypeRadio" id="cameraTypeLaptop" value="laptop" checked>
@@ -150,74 +192,67 @@
                 <p class="small text-muted mb-2">Isi alamat stream MJPEG dari kamera IP/ethernet Anda (biasanya tertera di manual kamera, contoh: <code>http://ALAMAT-IP/video</code> atau <code>http://ALAMAT-IP:8080/stream</code>). Kamera harus berada di jaringan/WiFi yang sama dengan perangkat ini. Catatan: kalau aplikasi ini dibuka lewat alamat <b>https://</b> (mis. GitHub Pages), browser bisa memblokir stream <b>http://</b> biasa (mixed content) - kalau stream tidak muncul, coba kamera yang mendukung https, atau hubungi Admin untuk solusi jaringan.</p>
               </div>
 
-              <label class="form-label small d-flex justify-content-between">Exposure <span id="exposureValue" class="text-muted">0</span></label>
-              <input type="range" id="exposureRange" class="form-range" min="-10" max="10" value="0">
-              <label class="form-label small d-flex justify-content-between">Brightness <span id="brightnessValue" class="text-muted">0</span></label>
-              <input type="range" id="brightnessRange" class="form-range" min="-100" max="100" value="0">
-              <label class="form-label small d-flex justify-content-between">Contrast <span id="contrastValue" class="text-muted">0</span></label>
-              <input type="range" id="contrastRange" class="form-range" min="-100" max="100" value="0">
-              <div class="d-flex gap-2 mb-3">
-                <button id="btnSetCameraAdjust" class="btn btn-sm btn-outline-primary flex-fill">Set (Simpan sebagai Default)</button>
-                <button id="btnResetCameraAdjust" class="btn btn-sm btn-outline-secondary flex-fill">Reset</button>
-              </div>
-              <label class="form-label small d-flex justify-content-between">Digital Zoom <span id="zoomValue" class="text-muted">100%</span></label>
-              <input type="range" id="zoomRange" class="form-range mb-2" min="100" max="300" value="100">
-              <div class="form-check mb-2">
-                <input type="checkbox" id="gridOverlayToggle" class="form-check-input">
-                <label class="form-check-label small" for="gridOverlayToggle">Tampilkan Grid &amp; Crosshair</label>
-              </div>
-              <div class="form-check mb-1">
-                <input type="checkbox" id="referenceGhostToggle" class="form-check-input" disabled>
-                <label class="form-check-label small" for="referenceGhostToggle">Bandingkan dengan Gambar Referensi</label>
-              </div>
-              <p class="small text-muted mb-2">Area yang HITAM = posisi part sama seperti referensi (sejajar). Area yang berwarna terang = ada perbedaan/pergeseran posisi.</p>
-              <div class="d-flex gap-2 mb-3">
-                <button id="btnSaveReference" class="btn btn-sm btn-outline-primary flex-fill">Simpan Frame Saat Ini sbg Referensi</button>
-                <button id="btnClearReference" class="btn btn-sm btn-outline-secondary" disabled>Hapus</button>
-              </div>
-              <div class="d-grid gap-2 mt-1" id="cameraLiveControls">
+              <div class="d-grid gap-2 mt-2" id="cameraLiveControls">
                 <button id="btnCapture" class="btn btn-primary"><span class="material-icons align-middle">photo_camera</span> Single Shot</button>
                 <button id="btnContinuous" class="btn btn-outline-secondary">Continuous Monitoring</button>
                 <button id="btnStopCamera" class="btn btn-outline-danger">Matikan Kamera</button>
               </div>
-              <div class="d-grid gap-2 mt-1 d-none" id="cameraFrozenControls">
-                <button id="btnSaveFrozenFrame" class="btn btn-success"><span class="material-icons align-middle">save</span> Simpan Frame Ini</button>
-                <button id="btnResumeLive" class="btn btn-outline-secondary">Lanjutkan Monitoring (Batal)</button>
-              </div>
               <p class="small text-muted mt-2 mb-0" id="cameraStatusText">Kamera aktif.</p>
             </div>
-          </div>
-        </div>
-        <div class="row g-3 mt-1">
-          <div class="col-md-8">
-            <div class="glass-card p-3">
-              <h6>Kumpulkan Sample untuk Dataset AI (Labeling)</h6>
-              <p class="small text-muted mb-2">Gunakan ini untuk mengambil foto part satu per satu (OK maupun berbagai jenis NG) SEBELUM recipe/AI model dibuat, sebagai bahan data yang nanti diberi label bounding box di Roboflow/CVAT. Berbeda dari Run Mode (yang butuh recipe aktif), fitur ini hanya perlu kamera menyala dan label yang Anda pilih sendiri.</p>
-              <div class="row g-2 align-items-end">
-                <div class="col-md-5">
-                  <label class="form-label small">Label</label>
-                  <select id="datasetLabelSelect" class="form-select form-select-sm">
-                    <option value="OK">OK (Part Normal)</option>
-                    <option value="NG_scratch">NG - Scratch (Goresan)</option>
-                    <option value="NG_karat">NG - Karat</option>
-                    <option value="NG_dent">NG - Penyok (Dent)</option>
-                    <option value="NG_crack">NG - Retak (Crack)</option>
-                    <option value="NG_missing_part">NG - Bagian Hilang</option>
-                    <option value="NG_dirty_surface">NG - Kotor</option>
-                    <option value="NG_wrong_assembly">NG - Salah Rakit</option>
-                    <option value="NG_lainnya">NG - Lainnya (isi manual)</option>
-                  </select>
-                </div>
-                <div class="col-md-4">
-                  <label class="form-label small">Label Manual (jika pilih "Lainnya")</label>
-                  <input type="text" id="datasetCustomLabel" class="form-control form-control-sm d-none" placeholder="mis. NG_baret_dalam">
-                </div>
-                <div class="col-md-3 d-grid">
-                  <button id="btnCaptureDataset" class="btn btn-sm btn-success">Ambil &amp; Simpan Sample</button>
+
+            <div class="accordion" id="cameraSettingsAccordion">
+              <div class="accordion-item">
+                <h2 class="accordion-header">
+                  <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#accExposure">Exposure / Brightness / Contrast</button>
+                </h2>
+                <div id="accExposure" class="accordion-collapse collapse show" data-bs-parent="#cameraSettingsAccordion">
+                  <div class="accordion-body">
+                    <label class="form-label small d-flex justify-content-between">Exposure <span id="exposureValue" class="text-muted">0</span></label>
+                    <input type="range" id="exposureRange" class="form-range" min="-10" max="10" value="0">
+                    <label class="form-label small d-flex justify-content-between">Brightness <span id="brightnessValue" class="text-muted">0</span></label>
+                    <input type="range" id="brightnessRange" class="form-range" min="-100" max="100" value="0">
+                    <label class="form-label small d-flex justify-content-between">Contrast <span id="contrastValue" class="text-muted">0</span></label>
+                    <input type="range" id="contrastRange" class="form-range" min="-100" max="100" value="0">
+                    <div class="d-flex gap-2 mt-2">
+                      <button id="btnSetCameraAdjust" class="btn btn-sm btn-outline-primary flex-fill">Set (Simpan sebagai Default)</button>
+                      <button id="btnResetCameraAdjust" class="btn btn-sm btn-outline-secondary flex-fill">Reset</button>
+                    </div>
+                  </div>
                 </div>
               </div>
-              <div id="datasetCaptureStatus" class="small mt-2"></div>
-              <div id="datasetCaptureCounter" class="small text-muted mt-1"></div>
+              <div class="accordion-item">
+                <h2 class="accordion-header">
+                  <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#accZoomGrid">Digital Zoom &amp; Grid</button>
+                </h2>
+                <div id="accZoomGrid" class="accordion-collapse collapse" data-bs-parent="#cameraSettingsAccordion">
+                  <div class="accordion-body">
+                    <label class="form-label small d-flex justify-content-between">Digital Zoom <span id="zoomValue" class="text-muted">100%</span></label>
+                    <input type="range" id="zoomRange" class="form-range mb-2" min="100" max="300" value="100">
+                    <div class="form-check mb-1">
+                      <input type="checkbox" id="gridOverlayToggle" class="form-check-input">
+                      <label class="form-check-label small" for="gridOverlayToggle">Tampilkan Grid &amp; Crosshair</label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="accordion-item">
+                <h2 class="accordion-header">
+                  <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#accReference">Gambar Referensi (Alignment)</button>
+                </h2>
+                <div id="accReference" class="accordion-collapse collapse" data-bs-parent="#cameraSettingsAccordion">
+                  <div class="accordion-body">
+                    <div class="form-check mb-1">
+                      <input type="checkbox" id="referenceGhostToggle" class="form-check-input" disabled>
+                      <label class="form-check-label small" for="referenceGhostToggle">Bandingkan dengan Gambar Referensi</label>
+                    </div>
+                    <p class="small text-muted mb-2">Area yang HITAM = posisi part sama seperti referensi (sejajar). Area yang berwarna terang = ada perbedaan/pergeseran posisi.</p>
+                    <div class="d-flex gap-2">
+                      <button id="btnSaveReference" class="btn btn-sm btn-outline-primary flex-fill">Simpan Frame Saat Ini sbg Referensi</button>
+                      <button id="btnClearReference" class="btn btn-sm btn-outline-secondary" disabled>Hapus</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>

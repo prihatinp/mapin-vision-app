@@ -119,8 +119,10 @@ function freezeFrame(base64) {
   document.getElementById('frozenFrameBadge').classList.remove('d-none');
   document.getElementById('cameraLiveControls').classList.add('d-none');
   document.getElementById('cameraFrozenControls').classList.remove('d-none');
+  const hint = document.getElementById('cameraFrozenControlsHint');
+  if (hint) hint.classList.add('d-none');
   const statusText = document.getElementById('cameraStatusText');
-  if (statusText) statusText.innerText = 'Frame dibekukan untuk ditinjau. Pilih label di panel bawah lalu klik "Simpan Frame Ini", atau klik "Lanjutkan Monitoring" untuk batal.';
+  if (statusText) statusText.innerText = 'Frame dibekukan untuk ditinjau. Klik "Simpan Frame Ini" untuk simpan sbg foto TEST (Drive/Test Images), atau pilih label & klik "Ambil & Simpan Sample" di panel bawah kalau untuk dataset AI, atau klik "Lanjutkan Monitoring" untuk batal.';
 }
 
 function resumeLiveView() {
@@ -132,6 +134,8 @@ function resumeLiveView() {
   document.getElementById('frozenFrameBadge').classList.add('d-none');
   document.getElementById('cameraLiveControls').classList.remove('d-none');
   document.getElementById('cameraFrozenControls').classList.add('d-none');
+  const hint = document.getElementById('cameraFrozenControlsHint');
+  if (hint) hint.classList.remove('d-none');
   if (cameraMode === 'ethernet') {
     if (ethernetActive) ethImg.classList.remove('d-none');
   } else {
@@ -141,10 +145,42 @@ function resumeLiveView() {
   if (isCameraActive()) document.getElementById('cameraStatusText').innerText = 'Kamera aktif.';
 }
 
+/**
+ * Tombol "Simpan Frame Ini" (di alur freeze-frame Single Shot) SENGAJA
+ * DIPISAHKAN dari "Kumpulkan Sample untuk Dataset AI" di bawahnya: yang
+ * ini untuk foto UJI COBA/pengecekan kamera (cek fokus, pencahayaan,
+ * posisi part, dsb.), disimpan ke Drive/Test Images/ TANPA label dan
+ * TIDAK ikut dipakai sebagai bahan labeling dataset AI. Kalau memang mau
+ * dipakai untuk labeling, gunakan panel "Kumpulkan Sample untuk Dataset
+ * AI" di bawah (pilih label dulu, lalu klik "Ambil & Simpan Sample" -
+ * itu otomatis memakai frame yang sama yang sedang dibekukan ini).
+ */
 function handleSaveFrozenFrame() {
   if (!frozenFrameBase64) return;
-  saveFrameToDataset(frozenFrameBase64, function (ok) {
+  saveFrameAsTest(frozenFrameBase64, function (ok) {
     if (ok) resumeLiveView(); // otomatis kembali live setelah berhasil tersimpan
+  });
+}
+
+function saveFrameAsTest(base64, onDone) {
+  const btnSave = document.getElementById('btnSaveFrozenFrame');
+  const statusText = document.getElementById('cameraStatusText');
+  if (btnSave) btnSave.disabled = true;
+  if (statusText) statusText.innerText = 'Menyimpan foto test...';
+
+  callApi('apiSaveTestImage', [base64, CURRENT_SESSION]).then(function (res) {
+    if (btnSave) btnSave.disabled = false;
+    if (res.success) {
+      if (statusText) statusText.innerText = 'Foto test tersimpan di Drive/Test Images/.';
+      if (onDone) onDone(true);
+    } else {
+      if (statusText) statusText.innerText = 'Gagal menyimpan foto test: ' + res.error;
+      if (onDone) onDone(false);
+    }
+  }).catch(function (err) {
+    if (btnSave) btnSave.disabled = false;
+    if (statusText) statusText.innerText = 'Gagal menyimpan foto test: ' + err.message;
+    if (onDone) onDone(false);
   });
 }
 
