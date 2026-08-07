@@ -88,7 +88,19 @@ function bindNav() {
   });
 }
 
+let _currentViewName = null;
+
 function showView(viewName) {
+  // Matikan kamera/polling dari menu yang sedang ditinggalkan, supaya
+  // kamera tidak tetap menyala di belakang layar saat pindah menu.
+  if (_currentViewName === 'camera' && viewName !== 'camera' && typeof stopCamera === 'function') {
+    stopCamera();
+  }
+  if (_currentViewName === 'run' && viewName !== 'run' && typeof stopRunMode === 'function') {
+    stopRunMode();
+  }
+  _currentViewName = viewName;
+
   document.querySelectorAll('.view').forEach(function (v) { v.classList.add('d-none'); });
   document.getElementById('view-' + viewName).classList.remove('d-none');
   document.getElementById('viewTitle').innerText = document.querySelector('.nav-menu li[data-view="' + viewName + '"]').innerText.trim();

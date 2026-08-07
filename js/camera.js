@@ -11,6 +11,39 @@ function initCameraCenter() {
   document.getElementById('btnContinuous').addEventListener('click', toggleContinuousMonitoring);
   document.getElementById('cameraSourceSelect').addEventListener('change', startSelectedCamera);
   document.getElementById('resolutionSelect').addEventListener('change', startSelectedCamera);
+
+  const btnStop = document.getElementById('btnStopCamera');
+  if (btnStop) {
+    btnStop.onclick = function () {
+      if (currentStream) {
+        stopCamera();
+      } else {
+        startSelectedCamera(); // kamera sedang mati -> tombol ini jadi "Nyalakan Kamera"
+      }
+    };
+  }
+}
+
+/**
+ * Mematikan kamera secara eksplisit: hentikan semua track stream (lampu
+ * indikator kamera fisik ikut padam) dan lepas video.srcObject. Sebelumnya
+ * tidak ada cara mematikan kamera selain pindah sumber/resolusi atau
+ * menutup tab browser - kamera bisa tetap menyala di belakang layar walau
+ * pengguna sudah pindah ke menu lain.
+ */
+function stopCamera() {
+  if (continuousInterval) { toggleContinuousMonitoring(); } // hentikan juga continuous monitoring jika aktif
+  if (currentStream) {
+    currentStream.getTracks().forEach(function (t) { t.stop(); });
+    currentStream = null;
+  }
+  const video = document.getElementById('cameraPreview');
+  if (video) video.srcObject = null;
+
+  const btnStop = document.getElementById('btnStopCamera');
+  if (btnStop) { btnStop.innerText = 'Nyalakan Kamera'; btnStop.classList.replace('btn-outline-danger', 'btn-outline-success'); }
+  const statusText = document.getElementById('cameraStatusText');
+  if (statusText) statusText.innerText = 'Kamera dimatikan. Klik "Nyalakan Kamera" untuk mengaktifkan lagi.';
 }
 
 /**
@@ -61,6 +94,11 @@ function startSelectedCamera() {
     const overlay = document.getElementById('cameraOverlay');
     overlay.width = w;
     overlay.height = h;
+
+    const btnStop = document.getElementById('btnStopCamera');
+    if (btnStop) { btnStop.innerText = 'Matikan Kamera'; btnStop.classList.replace('btn-outline-success', 'btn-outline-danger'); }
+    const statusText = document.getElementById('cameraStatusText');
+    if (statusText) statusText.innerText = 'Kamera aktif.';
   }).catch(function (err) {
     alert('Gagal mengakses kamera: ' + err.message);
   });

@@ -440,9 +440,12 @@ const AIInference = {
    RUN MODE - Orkestrasi Siklus Inspeksi Penuh (client-side)
    ================================================================== */
 let runOkCount = 0, runNgCount = 0;
+let runStream = null;
+let pollIntervalId = null;
 
 function initRunMode() {
   navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 } }).then(function (stream) {
+    runStream = stream;
     const runVideoEl = document.getElementById('runVideo');
     runVideoEl.muted = true; // wajib agar autoplay tidak diblokir browser
     runVideoEl.srcObject = stream;
@@ -480,7 +483,12 @@ function initRunMode() {
 
 let runPollingActive = false;
 function pollTriggerLoop() {
-  setInterval(function () {
+  // Hentikan interval polling sebelumnya (jika ada) sebelum membuat yang baru -
+  // sebelumnya setiap kali Run Mode dibuka ulang, interval BARU selalu dibuat
+  // tanpa membersihkan yang lama, sehingga polling dobel/berlipat terus
+  // bertambah tiap kali pengguna keluar-masuk menu Run Mode.
+  if (pollIntervalId) { clearInterval(pollIntervalId); }
+  pollIntervalId = setInterval(function () {
     if (!runPollingActive) return;
     callApi('apiGetIoStatusForUi', [CURRENT_SESSION]).then(function (status) {
       if (status.status === 'BUSY') {
@@ -488,6 +496,22 @@ function pollTriggerLoop() {
       }
     }).catch(function () { /* biarkan polling berikutnya coba lagi */ });
   }, 300); // simulasi WebSocket via polling ringan
+}
+
+/**
+ * Mematikan kamera & polling Run Mode secara eksplisit - dipanggil saat
+ * pengguna pindah ke menu lain (lihat showView() di app.js) agar kamera
+ * tidak tetap menyala dan polling tidak tetap berjalan di belakang layar.
+ */
+function stopRunMode() {
+  runPollingActive = false;
+  if (pollIntervalId) { clearInterval(pollIntervalId); pollIntervalId = null; }
+  if (runStream) {
+    runStream.getTracks().forEach(function (t) { t.stop(); });
+    runStream = null;
+  }
+  const runVideoEl = document.getElementById('runVideo');
+  if (runVideoEl) runVideoEl.srcObject = null;
 }
 
 async function runInspectionCycle() {
