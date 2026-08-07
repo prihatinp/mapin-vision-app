@@ -24,6 +24,86 @@ function initCameraCenter() {
   }
 
   initDatasetCapture();
+  initCameraAdjustments();
+}
+
+/* ==================================================================
+   PENGATURAN KAMERA - Exposure / Brightness / Contrast
+   Sebelumnya slider ini murni dekoratif (tidak ada JS yang mendengarkan
+   perubahannya sama sekali, jadi geser slider tidak berefek apa pun).
+   Sekarang setiap slider diterapkan LANGSUNG ke preview video lewat CSS
+   filter, dan filter YANG SAMA juga dipakai saat capture (Single Shot,
+   Continuous Monitoring, dataset sample) supaya hasil foto yang tersimpan
+   benar-benar mencerminkan tampilan preview, bukan gambar mentah kamera.
+   Tombol "Set" menyimpan kombinasi nilai saat ini sebagai default (lewat
+   localStorage) yang otomatis dipakai lagi lain kali Camera Center
+   dibuka; "Reset" mengembalikan ke netral (0/0/0) tanpa filter.
+   ================================================================== */
+const CAMERA_ADJUST_STORAGE_KEY = 'mapinCameraAdjustDefaults';
+
+function _getCameraAdjustValues() {
+  return {
+    exposure: parseFloat(document.getElementById('exposureRange').value) || 0,
+    brightness: parseFloat(document.getElementById('brightnessRange').value) || 0,
+    contrast: parseFloat(document.getElementById('contrastRange').value) || 0
+  };
+}
+
+/** Membangun string CSS/Canvas filter dari nilai exposure/brightness/contrast. */
+function buildCameraFilterString(values) {
+  // Exposure & Brightness sama-sama mengatur skala kecerahan, dikombinasikan
+  // secara multiplikatif; Exposure diberi bobot lebih kecil (mensimulasikan
+  // rentang stop kamera yang lebih halus dibanding slider Brightness).
+  const exposureFactor = 1 + (values.exposure / 10) * 0.5;   // -10..10 -> 0.5..1.5
+  const brightnessFactor = 1 + (values.brightness / 100);    // -100..100 -> 0..2
+  const combinedBrightness = Math.max(0, exposureFactor * brightnessFactor);
+  const contrastFactor = Math.max(0, 1 + (values.contrast / 100)); // -100..100 -> 0..2
+  return 'brightness(' + combinedBrightness.toFixed(3) + ') contrast(' + contrastFactor.toFixed(3) + ')';
+}
+
+function applyCameraAdjustments() {
+  const values = _getCameraAdjustValues();
+  document.getElementById('exposureValue').innerText = values.exposure;
+  document.getElementById('brightnessValue').innerText = values.brightness;
+  document.getElementById('contrastValue').innerText = values.contrast;
+
+  const filterStr = buildCameraFilterString(values);
+  const video = document.getElementById('cameraPreview');
+  if (video) video.style.filter = filterStr;
+}
+
+function initCameraAdjustments() {
+  ['exposureRange', 'brightnessRange', 'contrastRange'].forEach(function (id) {
+    document.getElementById(id).addEventListener('input', applyCameraAdjustments);
+  });
+
+  // Muat default tersimpan (jika ada) dan langsung terapkan ke slider + preview
+  try {
+    const saved = JSON.parse(localStorage.getItem(CAMERA_ADJUST_STORAGE_KEY) || 'null');
+    if (saved) {
+      document.getElementById('exposureRange').value = saved.exposure;
+      document.getElementById('brightnessRange').value = saved.brightness;
+      document.getElementById('contrastRange').value = saved.contrast;
+    }
+  } catch (e) { /* abaikan kalau data tersimpan rusak */ }
+  applyCameraAdjustments();
+
+  document.getElementById('btnSetCameraAdjust').onclick = function () {
+    const values = _getCameraAdjustValues();
+    try {
+      localStorage.setItem(CAMERA_ADJUST_STORAGE_KEY, JSON.stringify(values));
+      alert('Pengaturan Exposure/Brightness/Contrast saat ini disimpan sebagai default. Akan otomatis dipakai lagi setiap kali Camera Center dibuka.');
+    } catch (e) {
+      alert('Gagal menyimpan default (localStorage tidak tersedia di browser ini).');
+    }
+  };
+
+  document.getElementById('btnResetCameraAdjust').onclick = function () {
+    document.getElementById('exposureRange').value = 0;
+    document.getElementById('brightnessRange').value = 0;
+    document.getElementById('contrastRange').value = 0;
+    applyCameraAdjustments();
+  };
 }
 
 /* ==================================================================
@@ -154,6 +234,8 @@ function startSelectedCamera() {
     overlay.width = w;
     overlay.height = h;
 
+    if (typeof applyCameraAdjustments === 'function') applyCameraAdjustments(); // pastikan filter Exposure/Brightness/Contrast tetap terpasang
+
     const btnStop = document.getElementById('btnStopCamera');
     if (btnStop) { btnStop.innerText = 'Matikan Kamera'; btnStop.classList.replace('btn-outline-success', 'btn-outline-danger'); }
     const statusText = document.getElementById('cameraStatusText');
@@ -168,7 +250,13 @@ function captureSingleShot() {
   const canvas = document.createElement('canvas');
   canvas.width = video.videoWidth;
   canvas.height = video.videoHeight;
-  canvas.getContext('2d').drawImage(video, 0, 0);
+  const ctx = canvas.getContext('2d');
+  // Terapkan filter Exposure/Brightness/Contrast yang sama seperti di
+  // preview, supaya hasil capture konsisten dengan yang terlihat di layar
+  // (sebelumnya capture selalu mengambil gambar mentah kamera, mengabaikan
+  // pengaturan slider walau slider-nya sudah digeser).
+  ctx.filter = buildCameraFilterString(_getCameraAdjustValues());
+  ctx.drawImage(video, 0, 0);
   const base64 = canvas.toDataURL('image/jpeg', 0.9);
   return base64;
 }

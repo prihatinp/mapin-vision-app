@@ -115,13 +115,17 @@
                 <option value="1280x720" selected>1280 x 720</option>
                 <option value="1920x1080">1920 x 1080</option>
               </select>
-              <label class="form-label small">Exposure</label>
+              <label class="form-label small d-flex justify-content-between">Exposure <span id="exposureValue" class="text-muted">0</span></label>
               <input type="range" id="exposureRange" class="form-range" min="-10" max="10" value="0">
-              <label class="form-label small">Brightness</label>
+              <label class="form-label small d-flex justify-content-between">Brightness <span id="brightnessValue" class="text-muted">0</span></label>
               <input type="range" id="brightnessRange" class="form-range" min="-100" max="100" value="0">
-              <label class="form-label small">Contrast</label>
+              <label class="form-label small d-flex justify-content-between">Contrast <span id="contrastValue" class="text-muted">0</span></label>
               <input type="range" id="contrastRange" class="form-range" min="-100" max="100" value="0">
-              <div class="d-grid gap-2 mt-3">
+              <div class="d-flex gap-2 mb-3">
+                <button id="btnSetCameraAdjust" class="btn btn-sm btn-outline-primary flex-fill">Set (Simpan sebagai Default)</button>
+                <button id="btnResetCameraAdjust" class="btn btn-sm btn-outline-secondary flex-fill">Reset</button>
+              </div>
+              <div class="d-grid gap-2 mt-1">
                 <button id="btnCapture" class="btn btn-primary"><span class="material-icons align-middle">photo_camera</span> Single Shot</button>
                 <button id="btnContinuous" class="btn btn-outline-secondary">Continuous Monitoring</button>
                 <button id="btnStopCamera" class="btn btn-outline-danger">Matikan Kamera</button>
