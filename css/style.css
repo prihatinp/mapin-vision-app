@@ -1,0 +1,113 @@
+/* ==================================================================
+   MAP-IN Vision V1.0 - Stylesheet
+   Tema: Modern SaaS Dashboard, Glassmorphism, Industrial-AI
+   ================================================================== */
+:root{
+  --c-primary:#003366;
+  --c-secondary:#0055A4;
+  --c-accent:#FF0000;
+  --c-success:#00C853;
+  --c-bg:#F5F7FA;
+  --c-warning:#FFC107;
+  --radius-lg:16px;
+  --radius-md:10px;
+  --shadow-soft:0 8px 24px rgba(0,51,102,0.08);
+}
+
+*{box-sizing:border-box;}
+body{
+  margin:0;
+  background:linear-gradient(160deg,var(--c-bg) 0%,#e8edf5 100%);
+  font-family:'Segoe UI',Roboto,Arial,sans-serif;
+  color:#1a1a2e;
+}
+
+/* ---------- Glassmorphism card ---------- */
+.glass-card{
+  background:rgba(255,255,255,0.75);
+  backdrop-filter:blur(12px);
+  -webkit-backdrop-filter:blur(12px);
+  border:1px solid rgba(255,255,255,0.5);
+  border-radius:var(--radius-lg);
+  box-shadow:var(--shadow-soft);
+  transition:transform .2s ease, box-shadow .2s ease;
+}
+.glass-card:hover{ box-shadow:0 12px 32px rgba(0,51,102,0.14); }
+
+/* ---------- Login Screen ---------- */
+.login-screen{ min-height:100vh; background:radial-gradient(circle at top left,var(--c-secondary),var(--c-primary)); }
+.login-card{ width:380px; padding:2.5rem; }
+.logo-placeholder{ width:48px; opacity:.9; }
+.brand-title{ font-weight:800; color:var(--c-primary); letter-spacing:1px; }
+.text-accent{ color:var(--c-accent); }
+.brand-tagline{ color:var(--c-secondary); font-size:.85rem; font-style:italic; }
+
+/* ---------- App Shell ---------- */
+.app-shell{ display:flex; min-height:100vh; }
+.sidebar{
+  width:260px; background:linear-gradient(180deg,var(--c-primary),#001f3f);
+  color:#fff; display:flex; flex-direction:column; padding:1.25rem 0;
+  position:sticky; top:0; height:100vh;
+}
+.sidebar-brand{ display:flex; align-items:center; gap:.6rem; padding:0 1.25rem 1.25rem; border-bottom:1px solid rgba(255,255,255,.15); }
+.brand-icon{ font-size:32px; color:var(--c-accent); }
+.brand-name{ font-weight:700; font-size:.95rem; letter-spacing:.5px; }
+.brand-sub{ font-size:.7rem; opacity:.7; }
+
+.nav-menu{ list-style:none; padding:1rem 0; margin:0; flex:1; overflow-y:auto; }
+.nav-menu li{
+  display:flex; align-items:center; gap:.75rem; padding:.75rem 1.25rem;
+  cursor:pointer; font-size:.88rem; opacity:.85; transition:.2s;
+  border-left:3px solid transparent;
+}
+.nav-menu li .material-icons{ font-size:20px; }
+.nav-menu li:hover{ background:rgba(255,255,255,.08); opacity:1; }
+.nav-menu li.active{ background:rgba(255,255,255,.12); border-left-color:var(--c-accent); opacity:1; font-weight:600; }
+.sidebar-footer{ padding:1rem 1.25rem 0; }
+
+.main-content{ flex:1; display:flex; flex-direction:column; min-width:0; }
+.topbar{
+  height:64px; background:#fff; display:flex; align-items:center; justify-content:space-between;
+  padding:0 1.5rem; box-shadow:0 2px 8px rgba(0,0,0,.04); position:sticky; top:0; z-index:10;
+}
+.topbar-title{ font-weight:700; color:var(--c-primary); font-size:1.1rem; }
+.badge-role{ background:var(--c-secondary); color:#fff; padding:.25rem .6rem; border-radius:20px; font-size:.7rem; margin-right:.5rem; }
+.content-area{ padding:1.5rem; flex:1; }
+.view{ animation:fadeIn .3s ease; }
+@keyframes fadeIn{ from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:translateY(0);} }
+
+/* ---------- Stat Cards (Dashboard) ---------- */
+.stat-card{ padding:1.25rem; text-align:center; }
+.stat-icon{ font-size:30px; color:var(--c-secondary); }
+.stat-icon.success{ color:var(--c-success); }
+.stat-icon.danger{ color:var(--c-accent); }
+.stat-value{ font-size:1.8rem; font-weight:800; color:var(--c-primary); }
+.stat-label{ font-size:.75rem; color:#667; text-transform:uppercase; letter-spacing:.5px; }
+.chart-card{ padding:1.25rem; }
+
+/* ---------- Camera / Run Mode ---------- */
+.camera-preview-card, .roi-canvas-card{ position:relative; padding:.5rem; }
+.camera-preview-card video{ width:100%; border-radius:var(--radius-md); background:#000; }
+#cameraOverlay, #roiCanvas, #runOverlay{ position:absolute; top:.5rem; left:.5rem; pointer-events:none; }
+
+.run-mode-wrapper{ display:flex; gap:1rem; }
+.run-preview{ flex:3; position:relative; padding:.5rem; min-height:70vh; display:flex; align-items:center; justify-content:center; }
+.run-preview video{ width:100%; border-radius:var(--radius-md); background:#000; }
+.run-decision-badge{
+  position:absolute; top:1.5rem; right:1.5rem; padding:.75rem 1.5rem; border-radius:12px;
+  font-weight:800; font-size:1.4rem; background:#888; color:#fff; box-shadow:var(--shadow-soft);
+}
+.run-decision-badge.ok{ background:var(--c-success); }
+.run-decision-badge.ng{ background:var(--c-accent); }
+.run-sidepanel{ flex:1; padding:1.25rem; }
+.run-counter{ display:flex; justify-content:space-between; padding:.5rem 0; border-bottom:1px dashed #ddd; }
+
+/* ---------- Pipeline (AI Center) ---------- */
+.pipeline-steps{ display:flex; gap:.5rem; flex-wrap:wrap; }
+.pipeline-step{ padding:.4rem .8rem; border-radius:20px; background:#eee; font-size:.75rem; }
+.pipeline-step.active{ background:var(--c-secondary); color:#fff; font-weight:600; }
+
+.log-box{ height:180px; overflow-y:auto; background:#0d1b2a; color:#00ff9d; font-family:monospace; font-size:.75rem; padding:.5rem; border-radius:8px; }
+
+.btn-primary{ background:var(--c-secondary); border-color:var(--c-secondary); }
+.btn-primary:hover{ background:var(--c-primary); border-color:var(--c-primary); }

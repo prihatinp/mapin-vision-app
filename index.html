@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>MAP-IN Vision V1.0</title>
+<base target="_top">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- ============================================================
+     APP SHELL - Single Page Application
+     Struktur: Sidebar Nav (kiri) + Topbar + Content Area (dinamis)
+     Halaman (view) di-switch via JS (app.js -> router()), TIDAK
+     reload karena Apps Script HtmlService membatasi 1 halaman/doGet.
+     ============================================================ -->
+
+<div id="loginScreen" class="login-screen d-flex align-items-center justify-content-center">
+  <div class="login-card glass-card">
+    <div class="text-center mb-4">
+      <img src="https://www.gstatic.com/images/branding/product/2x/apps_script_48dp.png" class="logo-placeholder" alt="MAP-IN Vision">
+      <h2 class="brand-title">MAP-IN <span class="text-accent">VISION</span></h2>
+      <p class="brand-tagline">Intelligent Eyes for Manufacturing</p>
+      <p class="text-muted small">Musashi Indonesia</p>
+    </div>
+    <form id="loginForm">
+      <div class="mb-3">
+        <label class="form-label">Username</label>
+        <input type="text" id="loginUsername" class="form-control" required>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Password</label>
+        <input type="password" id="loginPassword" class="form-control" required>
+      </div>
+      <div id="loginError" class="text-danger small mb-2"></div>
+      <button type="submit" class="btn btn-primary w-100">Masuk</button>
+    </form>
+  </div>
+</div>
+
+<div id="appShell" class="app-shell d-none">
+
+  <!-- SIDEBAR -->
+  <nav class="sidebar">
+    <div class="sidebar-brand">
+      <span class="material-icons brand-icon">visibility</span>
+      <div>
+        <div class="brand-name">MAP-IN VISION</div>
+        <div class="brand-sub">Musashi Indonesia</div>
+      </div>
+    </div>
+    <ul class="nav-menu">
+      <li data-view="dashboard" class="active"><span class="material-icons">dashboard</span> Dashboard</li>
+      <li data-view="camera"><span class="material-icons">videocam</span> Camera Center</li>
+      <li data-view="recipe"><span class="material-icons">receipt_long</span> Recipe Management</li>
+      <li data-view="roiEditor"><span class="material-icons">crop_free</span> ROI Editor</li>
+      <li data-view="run"><span class="material-icons">play_circle</span> Run Mode</li>
+      <li data-view="aiCenter"><span class="material-icons">smart_toy</span> AI Detection Center</li>
+      <li data-view="ioMonitor"><span class="material-icons">memory</span> Arduino / ESP8266 IO</li>
+      <li data-view="history"><span class="material-icons">history</span> History & Traceability</li>
+      <li data-view="settings"><span class="material-icons">settings</span> Settings</li>
+    </ul>
+    <div class="sidebar-footer">
+      <button id="logoutBtn" class="btn btn-sm btn-outline-light w-100">
+        <span class="material-icons align-middle" style="font-size:16px;">logout</span> Logout
+      </button>
+    </div>
+  </nav>
+
+  <!-- MAIN CONTENT -->
+  <div class="main-content">
+    <header class="topbar">
+      <div class="topbar-title" id="viewTitle">Dashboard</div>
+      <div class="topbar-user">
+        <span class="badge-role" id="userRoleBadge">Operator</span>
+        <span id="userFullName">-</span>
+      </div>
+    </header>
+
+    <main class="content-area" id="contentArea">
+      <!-- ================= DASHBOARD VIEW ================= -->
+      <section id="view-dashboard" class="view">
+        <div class="row g-3 mb-3">
+          <div class="col-md-3"><div class="stat-card glass-card"><span class="material-icons stat-icon">precision_manufacturing</span><div class="stat-value" id="statProdToday">0</div><div class="stat-label">Produksi Hari Ini</div></div></div>
+          <div class="col-md-3"><div class="stat-card glass-card"><span class="material-icons stat-icon success">check_circle</span><div class="stat-value" id="statOk">0</div><div class="stat-label">OK Count</div></div></div>
+          <div class="col-md-3"><div class="stat-card glass-card"><span class="material-icons stat-icon danger">cancel</span><div class="stat-value" id="statNg">0</div><div class="stat-label">NG Count</div></div></div>
+          <div class="col-md-3"><div class="stat-card glass-card"><span class="material-icons stat-icon">insights</span><div class="stat-value" id="statYield">0%</div><div class="stat-label">Yield</div></div></div>
+        </div>
+        <div class="row g-3">
+          <div class="col-md-8"><div class="chart-card glass-card"><h6>Trend Harian OK/NG</h6><canvas id="dailyTrendChart" height="120"></canvas></div></div>
+          <div class="col-md-4"><div class="chart-card glass-card"><h6>Top NG Reason</h6><ul id="topNgList" class="list-unstyled"></ul></div></div>
+        </div>
+      </section>
+
+      <!-- ================= CAMERA CENTER VIEW ================= -->
+      <section id="view-camera" class="view d-none">
+        <div class="row g-3">
+          <div class="col-md-8">
+            <div class="camera-preview-card glass-card">
+              <video id="cameraPreview" autoplay playsinline muted></video>
+              <canvas id="cameraOverlay"></canvas>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="glass-card p-3">
+              <h6>Pengaturan Kamera</h6>
+              <label class="form-label small">Sumber Kamera</label>
+              <select id="cameraSourceSelect" class="form-select mb-2"></select>
+              <label class="form-label small">Resolusi</label>
+              <select id="resolutionSelect" class="form-select mb-2">
+                <option value="640x480">640 x 480</option>
+                <option value="1280x720" selected>1280 x 720</option>
+                <option value="1920x1080">1920 x 1080</option>
+              </select>
+              <label class="form-label small">Exposure</label>
+              <input type="range" id="exposureRange" class="form-range" min="-10" max="10" value="0">
+              <label class="form-label small">Brightness</label>
+              <input type="range" id="brightnessRange" class="form-range" min="-100" max="100" value="0">
+              <label class="form-label small">Contrast</label>
+              <input type="range" id="contrastRange" class="form-range" min="-100" max="100" value="0">
+              <div class="d-grid gap-2 mt-3">
+                <button id="btnCapture" class="btn btn-primary"><span class="material-icons align-middle">photo_camera</span> Single Shot</button>
+                <button id="btnContinuous" class="btn btn-outline-secondary">Continuous Monitoring</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= RECIPE MANAGEMENT VIEW ================= -->
+      <section id="view-recipe" class="view d-none">
+        <div class="d-flex justify-content-between mb-3">
+          <h5>Recipe Management</h5>
+          <button class="btn btn-primary btn-sm" id="btnNewRecipe"><span class="material-icons align-middle">add</span> Recipe Baru</button>
+        </div>
+        <div class="table-responsive glass-card p-2">
+          <table class="table table-hover align-middle mb-0" id="recipeTable">
+            <thead><tr><th>Nama</th><th>Versi</th><th>Status</th><th>Aksi</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ================= ROI EDITOR VIEW ================= -->
+      <section id="view-roiEditor" class="view d-none">
+        <div class="row g-3">
+          <div class="col-md-9">
+            <div class="roi-canvas-card glass-card">
+              <canvas id="roiCanvas"></canvas>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="glass-card p-3">
+              <h6>Recipe</h6>
+              <input type="text" id="recipeNameInput" class="form-control form-control-sm mb-2" placeholder="Nama Recipe (wajib diisi)">
+              <button id="btnSaveRecipe" class="btn btn-sm btn-success w-100 mb-2">💾 Simpan Recipe</button>
+              <p class="small text-muted mb-0">Semua perubahan ROI, Tool, dan parameter di halaman ini HANYA tersimpan permanen setelah tombol "Simpan Recipe" diklik.</p>
+              <hr>
+              <h6>Daftar ROI</h6>
+              <ul id="roiList" class="list-group mb-2"></ul>
+              <button id="btnAddRoi" class="btn btn-sm btn-primary w-100 mb-2">+ Tambah ROI</button>
+              <hr>
+              <h6>Vision Tools</h6>
+              <select id="toolTypeSelect" class="form-select form-select-sm mb-2">
+                <option value="PatternMatch">Pattern Matching</option>
+                <option value="Blob">Blob / Defect Area</option>
+                <option value="EdgeDimension">Edge / Dimension</option>
+                <option value="Presence">Presence / Absence</option>
+                <option value="Color">Color Inspection</option>
+                <option value="QR">QR Reader</option>
+                <option value="Barcode">Barcode Reader (1D)</option>
+                <option value="OCR">OCR (Baca Teks)</option>
+                <option value="Counting">Counting (Hitung Objek)</option>
+                <option value="AIDetection">AI Object Detection (YOLO)</option>
+                <option value="AIClassification">AI Classification</option>
+              </select>
+              <button id="btnAddTool" class="btn btn-sm btn-outline-primary w-100 mb-2">+ Tambah Tool ke ROI</button>
+              <button id="btnCaptureTemplate" class="btn btn-sm btn-outline-secondary w-100 d-none">Ambil Template dari ROI (Pattern Match)</button>
+              <hr>
+              <h6>Tool di ROI Terpilih</h6>
+              <ul id="roiToolList" class="list-group mb-2">
+                <li class="list-group-item small text-muted">Pilih ROI untuk melihat tool-nya.</li>
+              </ul>
+              <hr>
+              <h6>Kalibrasi (px → mm)</h6>
+              <p class="small text-muted mb-2">Dibutuhkan oleh tool Blob dan Edge/Dimension agar hasil dalam satuan mm.</p>
+              <button type="button" class="btn btn-sm btn-outline-primary w-100" data-bs-toggle="modal" data-bs-target="#calibrationModal">Buka Wizard Kalibrasi</button>
+              <div id="calibrationStatus" class="small text-muted mt-2">Belum dikalibrasi untuk recipe ini.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= MODAL: EDIT PARAMETER TOOL ================= -->
+      <div class="modal fade" id="editToolModal" tabindex="-1">
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h6 class="modal-title" id="editToolModalTitle">Edit Parameter Tool</h6>
+              <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="editToolParamsBody"></div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
+              <button id="btnSaveToolParams" class="btn btn-primary btn-sm">Simpan Parameter</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= MODAL: KALIBRASI CHECKERBOARD ================= -->
+      <div class="modal fade" id="calibrationModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h6 class="modal-title">Wizard Kalibrasi (Checkerboard → px/mm)</h6>
+              <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+              <p class="small">Letakkan papan catur kalibrasi (checkerboard) rata di depan kamera pada posisi kerja normal, lalu capture.</p>
+              <div class="row g-2 mb-2">
+                <div class="col-md-4">
+                  <label class="form-label small">Jumlah kotak (kolom)</label>
+                  <input type="number" id="calibCols" class="form-control form-control-sm" value="9">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label small">Jumlah kotak (baris)</label>
+                  <input type="number" id="calibRows" class="form-control form-control-sm" value="6">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label small">Ukuran 1 kotak (mm)</label>
+                  <input type="number" step="0.1" id="calibSquareMm" class="form-control form-control-sm" value="25">
+                </div>
+              </div>
+              <div class="d-flex gap-2 mb-2">
+                <button id="btnCalibCapture" class="btn btn-sm btn-primary">1. Capture Frame</button>
+                <button id="btnCalibDetect" class="btn btn-sm btn-outline-primary">2. Deteksi & Hitung</button>
+              </div>
+              <canvas id="calibCanvas" style="max-width:100%; border:1px solid #ccc;"></canvas>
+              <div id="calibResult" class="mt-2 small"></div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Tutup</button>
+              <button id="btnCalibSave" class="btn btn-primary btn-sm" disabled>Simpan Kalibrasi ke Recipe</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= RUN MODE VIEW ================= -->
+      <section id="view-run" class="view d-none">
+        <div class="run-mode-wrapper">
+          <div class="run-preview glass-card">
+            <video id="runVideo" autoplay playsinline muted></video>
+            <canvas id="runOverlay"></canvas>
+            <div id="runDecisionBadge" class="run-decision-badge">READY</div>
+          </div>
+          <div class="run-sidepanel glass-card">
+            <div class="run-counter"><span>OK</span><strong id="runOkCount">0</strong></div>
+            <div class="run-counter"><span>NG</span><strong id="runNgCount">0</strong></div>
+            <div class="run-counter"><span>Yield</span><strong id="runYield">0%</strong></div>
+            <hr>
+            <div id="runNgDetail" class="small text-danger"></div>
+            <div class="d-grid gap-2 mt-2">
+              <button id="btnPause" class="btn btn-outline-secondary btn-sm">Pause</button>
+              <button id="btnRecapture" class="btn btn-outline-primary btn-sm">Re-capture</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= AI DETECTION CENTER VIEW ================= -->
+      <section id="view-aiCenter" class="view d-none">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <div class="glass-card p-3">
+              <h6>Training Pipeline</h6>
+              <div class="pipeline-steps">
+                <div class="pipeline-step active" data-step="1">1. Dataset</div>
+                <div class="pipeline-step" data-step="2">2. Labeling</div>
+                <div class="pipeline-step" data-step="3">3. Train (Colab)</div>
+                <div class="pipeline-step" data-step="4">4. Export</div>
+                <div class="pipeline-step" data-step="5">5. Deploy</div>
+                <div class="pipeline-step" data-step="6">6. Inference</div>
+              </div>
+              <p class="small text-muted mt-2 mb-1">1-2. Data NG otomatis terkumpul di Drive/NG Images; beri label (bbox per defect) memakai Roboflow/CVAT.</p>
+              <p class="small text-muted mb-1">3. Latih model di Google Colab memakai notebook yang sudah disiapkan.</p>
+              <div class="mb-2">
+                <label class="form-label small">Nama Recipe (untuk konfigurasi dataset)</label>
+                <input type="text" id="colabRecipeName" class="form-control form-control-sm" placeholder="mis. GEAR-01">
+                <label class="form-label small mt-2">Kelas Defect (pisahkan koma)</label>
+                <input type="text" id="colabDefectClasses" class="form-control form-control-sm" value="scratch,burr,dent,crack,missing_part,dirty_surface,wrong_assembly">
+              </div>
+              <button class="btn btn-primary btn-sm" id="btnGenerateColab">Generate Konfigurasi &amp; Buka Colab</button>
+
+              <hr>
+              <p class="small text-muted mb-1">4-5. Setelah training selesai di Colab, model ONNX otomatis tersimpan ke Drive/Models. Unggah &amp; daftarkan di sini:</p>
+              <form id="importModelForm">
+                <label class="form-label small">Tipe Model</label>
+                <select id="modelTypeInput" class="form-select form-select-sm mb-2">
+                  <option value="detection">Object Detection (YOLO) - dipakai tool "AI Object Detection"</option>
+                  <option value="classification">Classification - dipakai tool "AI Classification"</option>
+                </select>
+                <input type="text" id="modelNameInput" class="form-control form-control-sm mb-2" placeholder="Nama model, mis. defect_detection_v1" required>
+                <input type="text" id="modelClassesInput" class="form-control form-control-sm mb-2" placeholder="Kelas (pisahkan koma)" required>
+                <input type="text" id="modelBaseInput" class="form-control form-control-sm mb-2" placeholder="Base model, mis. yolov8n / resnet18" value="yolov8n">
+                <input type="number" step="0.01" id="modelMapInput" class="form-control form-control-sm mb-2" placeholder="mAP50 (0-1), mis. 0.87">
+                <input type="file" id="modelFileInput" class="form-control form-control-sm mb-2" accept=".onnx" required>
+                <button type="submit" class="btn btn-outline-secondary btn-sm w-100" id="btnImportModel">Import Model (ONNX)</button>
+              </form>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="glass-card p-3">
+              <h6>Model Terdeploy</h6>
+              <table class="table table-sm" id="modelTable"><thead><tr><th>Model</th><th>Tipe</th><th>Kelas</th><th>mAP50</th><th>Status</th><th>Aksi</th></tr></thead><tbody></tbody></table>
+              <p class="small text-muted mb-0">6. Inference: model <strong>Aktif</strong> untuk masing-masing tipe (Detection / Classification) otomatis dimuat oleh browser (onnxruntime-web) saat Run Mode dijalankan, sesuai tool yang dipakai recipe ("AI Object Detection" atau "AI Classification"). Kedua tipe bisa aktif bersamaan karena masing-masing punya slot model sendiri.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= IO MONITOR VIEW ================= -->
+      <section id="view-ioMonitor" class="view d-none">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <div class="glass-card p-3">
+              <h6>Status Koneksi Perangkat</h6>
+              <div id="deviceStatusList"></div>
+              <hr>
+              <h6>Arduino Uno (USB / WebSerial)</h6>
+              <p class="small text-muted mb-2">Hanya didukung browser Chrome/Edge. Alternatif nirkabel: gunakan ESP8266 (lihat status polling di atas, tidak perlu tombol ini).</p>
+              <span id="arduinoConnectionStatus" class="badge bg-secondary mb-2">Tidak Terhubung</span>
+              <div class="d-grid">
+                <button id="btnConnectArduino" class="btn btn-sm btn-outline-primary">Hubungkan Arduino (USB)</button>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="glass-card p-3">
+              <h6>Manual Test Output</h6>
+              <div class="d-flex gap-2 mb-2">
+                <button class="btn btn-success btn-sm" data-signal="OK">OK</button>
+                <button class="btn btn-danger btn-sm" data-signal="NG">NG</button>
+                <button class="btn btn-warning btn-sm" data-signal="BUSY">BUSY</button>
+                <button class="btn btn-dark btn-sm" data-signal="ERROR">ERROR</button>
+              </div>
+              <h6 class="mt-3">Signal History</h6>
+              <div id="signalHistoryLog" class="log-box"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= HISTORY VIEW ================= -->
+      <section id="view-history" class="view d-none">
+        <div class="glass-card p-3 mb-3">
+          <div class="row g-2">
+            <div class="col-md-3"><input type="date" id="filterDateFrom" class="form-control form-control-sm"></div>
+            <div class="col-md-3"><input type="date" id="filterDateTo" class="form-control form-control-sm"></div>
+            <div class="col-md-2"><select id="filterDecision" class="form-select form-select-sm"><option value="">Semua</option><option value="OK">OK</option><option value="NG">NG</option></select></div>
+            <div class="col-md-2"><input type="text" id="filterSearch" class="form-control form-control-sm" placeholder="Cari..."></div>
+            <div class="col-md-1 d-grid"><button id="btnExportCsv" class="btn btn-sm btn-primary">Export CSV</button></div>
+            <div class="col-md-1 d-grid"><button id="btnExportNgPackage" class="btn btn-sm btn-outline-danger">Paket NG</button></div>
+          </div>
+        </div>
+        <div class="table-responsive glass-card p-2">
+          <table class="table table-sm table-hover" id="historyTable">
+            <thead><tr><th>Timestamp</th><th>Recipe</th><th>Operator</th><th>Decision</th><th>NG Reason</th><th>Cycle (ms)</th><th>Image</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ================= SETTINGS VIEW ================= -->
+      <section id="view-settings" class="view d-none">
+        <div class="glass-card p-3">
+          <h6>Company Profile</h6>
+          <p class="text-muted small">PT Musashi Auto Parts Indonesia</p>
+          <h6 class="mt-4">Backup & Restore</h6>
+          <p class="small text-muted mb-2">Backup menyalin seluruh Spreadsheet database (semua sheet) ke folder Drive/Backups. Dijalankan manual lewat tombol di bawah, atau bisa dijadwalkan otomatis mingguan dengan menjalankan fungsi installWeeklyBackupTrigger() sekali di Apps Script Editor (lihat panduan deployment).</p>
+          <button id="btnBackupNow" class="btn btn-outline-primary btn-sm mb-3">Backup Sekarang</button>
+          <h6>Riwayat Backup</h6>
+          <div id="backupHistoryList" class="border rounded p-2" style="max-height:200px; overflow-y:auto;">
+            <span class="text-muted small">Memuat...</span>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script src="https://docs.opencv.org/4.9.0/opencv.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.19.0/dist/ort.min.js"></script>
+<!-- ZXing-js: dipakai VisionTools.readBarcode() untuk decode barcode 1D nyata (Code128/EAN/UPC/dll),
+     menggantikan bug sebelumnya yang salah memakai jsQR (khusus QR) untuk tool Barcode. -->
+<script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.20.0/umd/index.min.js"></script>
+<!-- Tesseract.js: dipakai VisionTools.readOcr() untuk membaca teks di dalam ROI (tool OCR).
+     CATATAN PERFORMA: OCR jauh lebih lambat (~1 detik+) dibanding tool vision lain, dapat
+     berisiko melebihi target cycle time <=200ms pada PRD - gunakan hanya jika benar-benar perlu. -->
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.0/dist/tesseract.min.js"></script>
+
+<script src="js/api.js"></script>
+<script src="js/app.js"></script>
+<script src="js/camera.js"></script>
+<script src="js/visionTools.js"></script>
+<script src="js/roiEditor.js"></script>
+<script src="js/arduinoBridge.js"></script>
+<script src="js/calibration.js"></script>
+
+</body>
+</html>
