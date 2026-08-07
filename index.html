@@ -522,22 +522,59 @@
             <video id="runVideo" autoplay playsinline muted></video>
             <canvas id="runOverlay"></canvas>
             <div id="runDecisionBadge" class="run-decision-badge">READY</div>
+            <div id="runCameraOffOverlay" class="d-none" style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,.75); color:#fff; border-radius:var(--radius-md);">
+              <span class="material-icons align-middle me-2">videocam_off</span> Kamera dimatikan
+            </div>
           </div>
           <div class="run-sidepanel glass-card">
+            <div class="mb-3 p-2" style="background:rgba(0,85,164,.18); border-radius:8px;">
+              <div class="small text-muted">Program (Recipe) Aktif</div>
+              <div id="runActiveRecipeName" class="fw-bold">Memuat...</div>
+            </div>
+
+            <label class="form-label small">Mode Trigger</label>
+            <div class="btn-group w-100 mb-2" role="group">
+              <input type="radio" class="btn-check" name="runTriggerMode" id="triggerInternal" value="internal">
+              <label class="btn btn-outline-primary btn-sm" for="triggerInternal">Internal</label>
+              <input type="radio" class="btn-check" name="runTriggerMode" id="triggerExternal" value="external" checked>
+              <label class="btn btn-outline-primary btn-sm" for="triggerExternal">External (IO)</label>
+            </div>
+            <div id="internalTriggerControls" class="d-none mb-3">
+              <label class="form-label small">Interval Capture Otomatis (ms)</label>
+              <input type="number" id="internalTriggerInterval" class="form-control form-control-sm" value="1000" min="100" step="100">
+            </div>
+            <p id="externalTriggerHint" class="small text-muted mb-3">Menunggu sinyal trigger dari Arduino/ESP8266/PLC (via status IO). Pastikan perangkat sudah tersambung di menu "Arduino / ESP8266 IO".</p>
+
             <label class="form-label small">Resolusi Kamera Run Mode</label>
-            <select id="runResolutionSelect" class="form-select form-select-sm mb-3">
+            <select id="runResolutionSelect" class="form-select form-select-sm mb-2">
               <option value="640x480">640 x 480</option>
               <option value="1280x720" selected>1280 x 720</option>
               <option value="1920x1080">1920 x 1080</option>
             </select>
+            <button id="btnRunStopCamera" class="btn btn-sm btn-outline-danger w-100 mb-3">Matikan Kamera</button>
+
             <div class="run-counter"><span>OK</span><strong id="runOkCount">0</strong></div>
             <div class="run-counter"><span>NG</span><strong id="runNgCount">0</strong></div>
             <div class="run-counter"><span>Yield</span><strong id="runYield">0%</strong></div>
             <hr>
             <div id="runNgDetail" class="small text-danger"></div>
-            <div class="d-grid gap-2 mt-2">
-              <button id="btnPause" class="btn btn-outline-secondary btn-sm">Pause</button>
-              <button id="btnRecapture" class="btn btn-outline-primary btn-sm">Re-capture</button>
+            <div class="d-grid gap-2 mt-2 mb-3">
+              <button id="btnPause" class="btn btn-outline-secondary btn-sm">Pause Trigger</button>
+              <button id="btnRecapture" class="btn btn-outline-primary btn-sm">Re-capture Manual</button>
+            </div>
+
+            <hr>
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <h6 class="mb-0">Adjusting Judge OK/NG</h6>
+              <button id="btnToggleJudgeAdjust" class="btn btn-sm btn-outline-secondary">Buka</button>
+            </div>
+            <div id="judgeAdjustPanel" class="d-none">
+              <div id="judgeAdjustList" class="small"></div>
+              <div class="d-flex gap-2 mt-2">
+                <button id="btnApplyJudgeAdjust" class="btn btn-sm btn-primary flex-fill">Terapkan (Live)</button>
+                <button id="btnSaveJudgeAdjust" class="btn btn-sm btn-success flex-fill">Simpan ke Recipe</button>
+              </div>
+              <p class="small text-muted mt-2 mb-0">"Terapkan" langsung berlaku untuk siklus inspeksi berikutnya (belum permanen). Klik "Simpan ke Recipe" supaya perubahan ini tetap dipakai lain kali recipe ini diaktifkan lagi.</p>
             </div>
           </div>
         </div>

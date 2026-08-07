@@ -441,7 +441,8 @@ const AIInference = {
    ================================================================== */
 let runOkCount = 0, runNgCount = 0;
 let runStream = null;
-let pollIntervalId = null;
+let pollIntervalId = null; // trigger EXTERNAL (polling status IO)
+let internalTriggerIntervalId = null; // trigger INTERNAL (timer capture otomatis)
 
 function initRunMode() {
   startRunCamera();
@@ -449,8 +450,25 @@ function initRunMode() {
   const resSelect = document.getElementById('runResolutionSelect');
   if (resSelect) resSelect.onchange = startRunCamera; // ganti resolusi -> nyalakan ulang stream dgn ukuran baru
 
-  callApi('apiGetRecipe', [window.ACTIVE_RECIPE_ID, CURRENT_SESSION]).then(function (res) {
+  const btnRunStopCamera = document.getElementById('btnRunStopCamera');
+  if (btnRunStopCamera) btnRunStopCamera.onclick = toggleRunCamera;
+
+  // Muat recipe yang sedang AKTIF (ditandai "Aktifkan" di Recipe Management) -
+  // SEBELUMNYA Run Mode memakai window.ACTIVE_RECIPE_ID yang tidak pernah
+  // diisi sama sekali di kode manapun, sehingga Run Mode selalu gagal
+  // memuat recipe apapun (bug ini yang menyebabkan pertanyaan "ambil
+  // program dari recipe yang mana?" - jawabannya dulu: TIDAK ADA/gagal).
+  const nameEl = document.getElementById('runActiveRecipeName');
+  if (nameEl) nameEl.innerText = 'Memuat...';
+  callApi('apiGetActiveRecipe', [CURRENT_SESSION]).then(function (res) {
+    if (!res.success) {
+      if (nameEl) nameEl.innerText = 'Tidak ada recipe aktif';
+      alert(res.error || 'Belum ada recipe yang diaktifkan.');
+      return;
+    }
     ACTIVE_RECIPE = res.recipe;
+    if (nameEl) nameEl.innerText = ACTIVE_RECIPE.name + ' (v' + ACTIVE_RECIPE.version + ')';
+
     const hasDetectionTool = (ACTIVE_RECIPE.tools || []).some(function (t) { return t.type === 'AIDetection'; });
     const hasClassificationTool = (ACTIVE_RECIPE.tools || []).some(function (t) { return t.type === 'AIClassification'; });
     if (hasDetectionTool) {
@@ -464,16 +482,23 @@ function initRunMode() {
       });
     }
     TemplateCache.ensureLoaded(ACTIVE_RECIPE);
-  }).catch(function (err) { console.warn('Gagal memuat recipe untuk Run Mode:', err.message); });
+    renderJudgeAdjustList();
+  }).catch(function (err) {
+    if (nameEl) nameEl.innerText = 'Gagal memuat recipe';
+    console.warn('Gagal memuat recipe untuk Run Mode:', err.message);
+  });
 
   document.getElementById('btnPause').onclick = function () {
     runPollingActive = !runPollingActive;
-    this.innerText = runPollingActive ? 'Pause' : 'Resume';
+    this.innerText = runPollingActive ? 'Pause Trigger' : 'Resume Trigger';
   };
   document.getElementById('btnRecapture').onclick = runInspectionCycle;
 
+  initTriggerModeControls();
+  initJudgeAdjustPanel();
+
   runPollingActive = true;
-  pollTriggerLoop();
+  startSelectedTriggerLoop();
 }
 
 /**
@@ -498,18 +523,71 @@ function startRunCamera() {
     runVideoEl.muted = true; // wajib agar autoplay tidak diblokir browser
     runVideoEl.srcObject = stream;
     runVideoEl.play().catch(function (playErr) { console.warn('video.play() gagal:', playErr); });
+    document.getElementById('runCameraOffOverlay').classList.add('d-none');
+    const btn = document.getElementById('btnRunStopCamera');
+    if (btn) { btn.innerText = 'Matikan Kamera'; btn.classList.replace('btn-outline-success', 'btn-outline-danger'); }
   }).catch(function (err) {
     alert('Gagal mengakses kamera untuk Run Mode: ' + err.message);
   });
 }
 
-let runPollingActive = false;
-function pollTriggerLoop() {
-  // Hentikan interval polling sebelumnya (jika ada) sebelum membuat yang baru -
-  // sebelumnya setiap kali Run Mode dibuka ulang, interval BARU selalu dibuat
-  // tanpa membersihkan yang lama, sehingga polling dobel/berlipat terus
-  // bertambah tiap kali pengguna keluar-masuk menu Run Mode.
-  if (pollIntervalId) { clearInterval(pollIntervalId); }
+/**
+ * Tombol "Matikan Kamera" di Run Mode - SEBELUMNYA tidak ada cara mematikan
+ * kamera sama sekali selain pindah menu (tombol "Pause" cuma menghentikan
+ * TRIGGER inspeksi, kameranya sendiri tetap menyala terus). Sekarang kamera
+ * betul-betul bisa dimatikan (lampu indikator kamera fisik ikut padam),
+ * trigger juga otomatis di-pause supaya tidak coba capture dari kamera mati.
+ */
+function toggleRunCamera() {
+  const btn = document.getElementById('btnRunStopCamera');
+  const overlay = document.getElementById('runCameraOffOverlay');
+  if (runStream) {
+    runStream.getTracks().forEach(function (t) { t.stop(); });
+    runStream = null;
+    document.getElementById('runVideo').srcObject = null;
+    overlay.classList.remove('d-none');
+    if (btn) { btn.innerText = 'Nyalakan Kamera'; btn.classList.replace('btn-outline-danger', 'btn-outline-success'); }
+    runPollingActive = false; // tidak ada gunanya trigger jalan kalau kamera mati
+    const btnPause = document.getElementById('btnPause');
+    if (btnPause) btnPause.innerText = 'Resume Trigger';
+  } else {
+    startRunCamera();
+  }
+}
+
+/* ==================================================================
+   MODE TRIGGER: INTERNAL (timer otomatis, seperti Continuous Monitoring)
+   vs EXTERNAL (menunggu sinyal dari Arduino/ESP8266/PLC lewat status IO -
+   perilaku asli sebelum fitur ini ditambahkan).
+   ================================================================== */
+let runTriggerMode = 'external';
+
+function initTriggerModeControls() {
+  document.querySelectorAll('input[name="runTriggerMode"]').forEach(function (radio) {
+    radio.onchange = function () {
+      runTriggerMode = radio.value;
+      document.getElementById('internalTriggerControls').classList.toggle('d-none', runTriggerMode !== 'internal');
+      document.getElementById('externalTriggerHint').classList.toggle('d-none', runTriggerMode !== 'external');
+      startSelectedTriggerLoop();
+    };
+  });
+  const intervalInput = document.getElementById('internalTriggerInterval');
+  if (intervalInput) intervalInput.onchange = function () { if (runTriggerMode === 'internal') startSelectedTriggerLoop(); };
+}
+
+function startSelectedTriggerLoop() {
+  stopTriggerLoops();
+  if (runTriggerMode === 'internal') startInternalTriggerLoop();
+  else startExternalTriggerLoop();
+}
+
+function stopTriggerLoops() {
+  if (pollIntervalId) { clearInterval(pollIntervalId); pollIntervalId = null; }
+  if (internalTriggerIntervalId) { clearInterval(internalTriggerIntervalId); internalTriggerIntervalId = null; }
+}
+
+/** Trigger EXTERNAL - menunggu sinyal Arduino/ESP8266/PLC (status IO = BUSY). */
+function startExternalTriggerLoop() {
   pollIntervalId = setInterval(function () {
     if (!runPollingActive) return;
     callApi('apiGetIoStatusForUi', [CURRENT_SESSION]).then(function (status) {
@@ -520,6 +598,16 @@ function pollTriggerLoop() {
   }, 300); // simulasi WebSocket via polling ringan
 }
 
+/** Trigger INTERNAL - capture & inspeksi otomatis tiap interval yang diset operator. */
+function startInternalTriggerLoop() {
+  const intervalInput = document.getElementById('internalTriggerInterval');
+  const intervalMs = Math.max(100, parseInt((intervalInput && intervalInput.value) || 1000, 10));
+  internalTriggerIntervalId = setInterval(function () {
+    if (!runPollingActive) return;
+    runInspectionCycle();
+  }, intervalMs);
+}
+
 /**
  * Mematikan kamera & polling Run Mode secara eksplisit - dipanggil saat
  * pengguna pindah ke menu lain (lihat showView() di app.js) agar kamera
@@ -527,13 +615,117 @@ function pollTriggerLoop() {
  */
 function stopRunMode() {
   runPollingActive = false;
-  if (pollIntervalId) { clearInterval(pollIntervalId); pollIntervalId = null; }
+  stopTriggerLoops();
   if (runStream) {
     runStream.getTracks().forEach(function (t) { t.stop(); });
     runStream = null;
   }
   const runVideoEl = document.getElementById('runVideo');
   if (runVideoEl) runVideoEl.srcObject = null;
+}
+
+/* ==================================================================
+   ADJUSTING JUDGE OK/NG (live threshold tuning, ala Keyence VS Series)
+   Menampilkan parameter utama tiap tool di recipe aktif supaya bisa
+   di-fine-tune langsung dari Run Mode tanpa perlu bolak-balik ke ROI
+   Editor. "Terapkan" = berlaku langsung (in-memory) utk siklus berikutnya;
+   "Simpan ke Recipe" = dipersist ke server lewat apiSaveRecipe.
+   ================================================================== */
+function initJudgeAdjustPanel() {
+  const btnToggle = document.getElementById('btnToggleJudgeAdjust');
+  const panel = document.getElementById('judgeAdjustPanel');
+  if (btnToggle) {
+    btnToggle.onclick = function () {
+      const nowHidden = panel.classList.toggle('d-none');
+      btnToggle.innerText = nowHidden ? 'Buka' : 'Tutup';
+      if (!nowHidden) renderJudgeAdjustList();
+    };
+  }
+  const btnApply = document.getElementById('btnApplyJudgeAdjust');
+  if (btnApply) btnApply.onclick = applyJudgeAdjustments;
+
+  const btnSave = document.getElementById('btnSaveJudgeAdjust');
+  if (btnSave) {
+    btnSave.onclick = function () {
+      applyJudgeAdjustments();
+      if (!ACTIVE_RECIPE) return;
+      btnSave.disabled = true;
+      callApi('apiSaveRecipe', [ACTIVE_RECIPE, CURRENT_SESSION]).then(function (res) {
+        btnSave.disabled = false;
+        if (res.success) {
+          Object.assign(ACTIVE_RECIPE, res.recipe);
+          alert('Perubahan parameter judge berhasil disimpan ke recipe "' + ACTIVE_RECIPE.name + '".');
+        } else {
+          alert('Gagal menyimpan: ' + res.error);
+        }
+      }).catch(function (err) {
+        btnSave.disabled = false;
+        alert('Gagal menyimpan: ' + err.message);
+      });
+    };
+  }
+}
+
+/** Daftar field parameter utama yang bisa di-adjust per tipe tool (input id -> params key). */
+function _judgeAdjustFieldsForType(type) {
+  switch (type) {
+    case 'PatternMatch': return [{ key: 'threshold', label: 'Threshold Similarity (0-1)', step: 0.01 }];
+    case 'Blob': return [{ key: 'minAreaMm2', label: 'Min Area Defect (mm²)', step: 0.01 }];
+    case 'EdgeDimension': return [{ key: 'toleranceMm', label: 'Toleransi (mm)', step: 0.01 }, { key: 'nominalMm', label: 'Nominal (mm)', step: 0.01 }];
+    case 'Presence': return [{ key: 'pixelThresholdPct', label: 'Threshold Piksel (%)', step: 0.1 }];
+    case 'Color': return [{ key: 'threshold', label: 'Toleransi (+/-)', step: 1 }, { key: 'targetMean', label: 'Target Mean (0-255)', step: 1 }];
+    case 'Counting': return [{ key: 'expectedMin', label: 'Jumlah Minimum', step: 1 }, { key: 'expectedMax', label: 'Jumlah Maksimum', step: 1 }];
+    case 'AIClassification': return [{ key: 'confidenceThreshold', label: 'Confidence Threshold (0-1)', step: 0.01 }];
+    case 'AIDetection': return [{ key: 'confidenceThreshold', label: 'Confidence Threshold (0-1)', step: 0.01 }];
+    default: return []; // QR/Barcode/OCR: berbasis rule teks, bukan angka - tidak ada quick-adjust di sini
+  }
+}
+
+function renderJudgeAdjustList() {
+  const listEl = document.getElementById('judgeAdjustList');
+  if (!listEl || !ACTIVE_RECIPE) return;
+  listEl.innerHTML = '';
+
+  const tools = ACTIVE_RECIPE.tools || [];
+  if (!tools.length) { listEl.innerHTML = '<p class="text-muted mb-0">Recipe ini belum punya tool.</p>'; return; }
+
+  tools.forEach(function (tool) {
+    const fields = _judgeAdjustFieldsForType(tool.type);
+    if (!fields.length) return;
+    const roi = (ACTIVE_RECIPE.rois || []).find(function (r) { return r.id === tool.roiId; });
+
+    const wrap = document.createElement('div');
+    wrap.className = 'mb-2 pb-2 border-bottom';
+    let html = '<div class="fw-bold">' + toolTypeLabel(tool.type) + (roi ? ' &middot; ' + roi.name : '') + '</div>';
+    fields.forEach(function (f) {
+      const val = tool.params && tool.params[f.key] != null ? tool.params[f.key] : '';
+      html += '<label class="form-label small mb-0 mt-1">' + f.label + '</label>' +
+        '<input type="number" step="' + f.step + '" class="form-control form-control-sm judge-adjust-input" ' +
+        'data-tool-id="' + tool.id + '" data-param-key="' + f.key + '" value="' + val + '">';
+    });
+    wrap.innerHTML = html;
+    listEl.appendChild(wrap);
+  });
+}
+
+/** toolTypeLabel() sudah ada di roiEditor.js (dimuat sebelum visionTools.js) - dipakai ulang di sini. */
+
+function applyJudgeAdjustments() {
+  if (!ACTIVE_RECIPE) return;
+  document.querySelectorAll('.judge-adjust-input').forEach(function (input) {
+    const toolId = input.getAttribute('data-tool-id');
+    const paramKey = input.getAttribute('data-param-key');
+    const tool = (ACTIVE_RECIPE.tools || []).find(function (t) { return t.id === toolId; });
+    if (!tool) return;
+    tool.params = tool.params || {};
+    tool.params[paramKey] = parseFloat(input.value);
+  });
+  const statusMsg = document.getElementById('runNgDetail');
+  if (statusMsg) {
+    const prev = statusMsg.innerHTML;
+    statusMsg.innerHTML = '<span class="text-success">Parameter judge diterapkan untuk siklus berikutnya.</span>';
+    setTimeout(function () { statusMsg.innerHTML = prev; }, 2500);
+  }
 }
 
 async function runInspectionCycle() {
