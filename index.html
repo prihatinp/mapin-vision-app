@@ -385,8 +385,9 @@
         <div class="row g-3">
           <div class="col-md-9">
             <div class="roi-canvas-card glass-card">
-              <div class="d-flex gap-2 align-items-center mb-2">
+              <div class="d-flex gap-2 align-items-center mb-2 flex-wrap">
                 <button id="btnRoiCaptureCamera" class="btn btn-sm btn-primary"><span class="material-icons align-middle" style="font-size:16px;">photo_camera</span> Ambil Gambar dari Kamera</button>
+                <button id="btnRoiOpenTestImage" class="btn btn-sm btn-outline-primary"><span class="material-icons align-middle" style="font-size:16px;">folder_open</span> Buka dari Test Images</button>
                 <span id="roiCaptureStatus" class="small text-muted"></span>
               </div>
               <div id="roiEmptyState" class="text-center text-muted py-5">
@@ -457,6 +458,24 @@
         </div>
       </div>
 
+      <!-- ================= MODAL: BUKA GAMBAR DARI TEST IMAGES ================= -->
+      <div class="modal fade" id="openTestImageModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h6 class="modal-title">Pilih Gambar dari Test Images</h6>
+              <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+              <p class="small text-muted">Menampilkan foto test terbaru (hasil "Simpan Frame Ini" di Camera Center). Klik salah satu foto untuk dipakai sebagai gambar referensi ROI - ukuran gambar akan mengikuti ukuran asli saat foto itu disimpan.</p>
+              <div id="testImageLoadingMsg" class="text-center text-muted small py-4">Memuat daftar foto...</div>
+              <div id="testImageEmptyMsg" class="text-center text-muted small py-4 d-none">Belum ada foto test tersimpan. Buka Camera Center, klik Single Shot lalu "Simpan Frame Ini" dulu.</div>
+              <div id="testImageGrid" class="row g-2"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- ================= MODAL: KALIBRASI CHECKERBOARD ================= -->
       <div class="modal fade" id="calibrationModal" tabindex="-1">
         <div class="modal-dialog modal-lg">
@@ -505,6 +524,12 @@
             <div id="runDecisionBadge" class="run-decision-badge">READY</div>
           </div>
           <div class="run-sidepanel glass-card">
+            <label class="form-label small">Resolusi Kamera Run Mode</label>
+            <select id="runResolutionSelect" class="form-select form-select-sm mb-3">
+              <option value="640x480">640 x 480</option>
+              <option value="1280x720" selected>1280 x 720</option>
+              <option value="1920x1080">1920 x 1080</option>
+            </select>
             <div class="run-counter"><span>OK</span><strong id="runOkCount">0</strong></div>
             <div class="run-counter"><span>NG</span><strong id="runNgCount">0</strong></div>
             <div class="run-counter"><span>Yield</span><strong id="runYield">0%</strong></div>

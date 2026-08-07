@@ -122,6 +122,9 @@ function initRoiEditor() {
   const btnRoiCaptureCamera = document.getElementById('btnRoiCaptureCamera');
   if (btnRoiCaptureCamera) btnRoiCaptureCamera.onclick = captureRoiReferenceFromCamera;
 
+  const btnRoiOpenTestImage = document.getElementById('btnRoiOpenTestImage');
+  if (btnRoiOpenTestImage) btnRoiOpenTestImage.onclick = openTestImagePicker;
+
   document.getElementById('btnAddRoi').onclick = function () {
     if (!backgroundImage) {
       alert('Ambil gambar referensi dulu (tombol "Ambil Gambar dari Kamera" di atas) sebelum menambah ROI, supaya ROI-nya bisa digambar di atas gambar part yang benar.');
@@ -229,6 +232,91 @@ function captureRoiReferenceFromCamera() {
       if (btn) btn.disabled = false;
       if (statusEl) statusEl.innerText = 'Gagal mengakses kamera: ' + err.message;
     });
+}
+
+/* ==================================================================
+   BUKA GAMBAR DARI TEST IMAGES
+   Menu "Buka dari Test Images" - alternatif dari "Ambil Gambar dari
+   Kamera", supaya Engineer bisa MEMILIH foto test terbaik (sudah pernah
+   diambil sebelumnya lewat Camera Center - "Simpan Frame Ini") untuk
+   dijadikan acuan menggambar ROI & set up tool, alih-alih harus selalu
+   ambil frame baru langsung dari kamera saat itu juga. Gambar yang
+   dipilih dipakai APA ADANYA (dimensi mengikuti ukuran asli file saat
+   disimpan, tidak dipaksa ke ukuran tertentu).
+   ================================================================== */
+let testImageModalInstance = null;
+let _testImageBase64Cache = {}; // fileId -> data URI, supaya klik pilih tidak fetch ulang dari yang sudah dimuat sbg thumbnail
+const TEST_IMAGE_PICKER_LIMIT = 12; // batasi jumlah thumbnail yang dimuat sekaligus, supaya modal tidak lambat
+
+function openTestImagePicker() {
+  const modalEl = document.getElementById('openTestImageModal');
+  if (!testImageModalInstance) testImageModalInstance = new bootstrap.Modal(modalEl);
+  testImageModalInstance.show();
+
+  const grid = document.getElementById('testImageGrid');
+  const loadingMsg = document.getElementById('testImageLoadingMsg');
+  const emptyMsg = document.getElementById('testImageEmptyMsg');
+  grid.innerHTML = '';
+  emptyMsg.classList.add('d-none');
+  loadingMsg.classList.remove('d-none');
+  _testImageBase64Cache = {};
+
+  callApi('apiListTestImages', [TEST_IMAGE_PICKER_LIMIT, CURRENT_SESSION]).then(function (res) {
+    loadingMsg.classList.add('d-none');
+    if (!res.success) { alert('Gagal memuat daftar Test Images: ' + res.error); return; }
+    if (!res.images || !res.images.length) { emptyMsg.classList.remove('d-none'); return; }
+
+    res.images.forEach(function (img) {
+      const col = document.createElement('div');
+      col.className = 'col-4 col-md-3';
+      col.innerHTML =
+        '<div class="text-center">' +
+          '<div class="roi-thumb-wrap" style="background:rgba(255,255,255,.05); border-radius:8px; height:110px; display:flex; align-items:center; justify-content:center; cursor:pointer; overflow:hidden;" data-file-id="' + img.fileId + '">' +
+            '<span class="small text-muted">Memuat...</span>' +
+          '</div>' +
+          '<div class="small text-muted mt-1">' + img.dateFolder + '</div>' +
+        '</div>';
+      grid.appendChild(col);
+
+      const wrap = col.querySelector('.roi-thumb-wrap');
+      callApi('apiGetDriveImageBase64', [img.fileId, CURRENT_SESSION]).then(function (imgRes) {
+        if (!imgRes.success) { wrap.innerHTML = '<span class="small text-danger">Gagal memuat</span>'; return; }
+        _testImageBase64Cache[img.fileId] = imgRes.dataUri;
+        wrap.innerHTML = '<img src="' + imgRes.dataUri + '" style="max-width:100%; max-height:100%;">';
+        wrap.onclick = function () { selectTestImage(img.fileId); };
+      }).catch(function () { wrap.innerHTML = '<span class="small text-danger">Gagal memuat</span>'; });
+    });
+  }).catch(function (err) {
+    loadingMsg.classList.add('d-none');
+    alert('Gagal memuat daftar Test Images: ' + err.message);
+  });
+}
+
+function selectTestImage(fileId) {
+  const dataUri = _testImageBase64Cache[fileId];
+  if (!dataUri) return;
+
+  const img = new Image();
+  img.onload = function () {
+    // Dimensi kanvas ROI mengikuti ukuran ASLI gambar yang dipilih (bukan
+    // dipaksa 1280x720 atau ukuran lain) - sesuai permintaan: "dimensi
+    // image-nya menyesuaikan saat di simpan".
+    const canvasEl = document.getElementById('roiCanvas');
+    const tmp = document.createElement('canvas');
+    tmp.width = img.naturalWidth;
+    tmp.height = img.naturalHeight;
+    tmp.getContext('2d').drawImage(img, 0, 0);
+    backgroundImage = tmp;
+    canvasEl.width = tmp.width;
+    canvasEl.height = tmp.height;
+
+    _updateRoiEmptyState();
+    redrawCanvas();
+    if (testImageModalInstance) testImageModalInstance.hide();
+    const statusEl = document.getElementById('roiCaptureStatus');
+    if (statusEl) statusEl.innerText = 'Gambar referensi dimuat dari Test Images (' + tmp.width + 'x' + tmp.height + ').';
+  };
+  img.src = dataUri;
 }
 
 function getDefaultParamsForTool(type) {

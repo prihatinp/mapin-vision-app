@@ -444,15 +444,10 @@ let runStream = null;
 let pollIntervalId = null;
 
 function initRunMode() {
-  navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 } }).then(function (stream) {
-    runStream = stream;
-    const runVideoEl = document.getElementById('runVideo');
-    runVideoEl.muted = true; // wajib agar autoplay tidak diblokir browser
-    runVideoEl.srcObject = stream;
-    runVideoEl.play().catch(function (playErr) { console.warn('video.play() gagal:', playErr); });
-  }).catch(function (err) {
-    alert('Gagal mengakses kamera untuk Run Mode: ' + err.message);
-  });
+  startRunCamera();
+
+  const resSelect = document.getElementById('runResolutionSelect');
+  if (resSelect) resSelect.onchange = startRunCamera; // ganti resolusi -> nyalakan ulang stream dgn ukuran baru
 
   callApi('apiGetRecipe', [window.ACTIVE_RECIPE_ID, CURRENT_SESSION]).then(function (res) {
     ACTIVE_RECIPE = res.recipe;
@@ -471,14 +466,41 @@ function initRunMode() {
     TemplateCache.ensureLoaded(ACTIVE_RECIPE);
   }).catch(function (err) { console.warn('Gagal memuat recipe untuk Run Mode:', err.message); });
 
-  document.getElementById('btnPause').addEventListener('click', function () {
+  document.getElementById('btnPause').onclick = function () {
     runPollingActive = !runPollingActive;
     this.innerText = runPollingActive ? 'Pause' : 'Resume';
-  });
-  document.getElementById('btnRecapture').addEventListener('click', runInspectionCycle);
+  };
+  document.getElementById('btnRecapture').onclick = runInspectionCycle;
 
   runPollingActive = true;
   pollTriggerLoop();
+}
+
+/**
+ * Nyalakan (atau nyalakan ULANG, kalau dipanggil karena ganti resolusi)
+ * kamera Run Mode sesuai resolusi yang dipilih di dropdown
+ * #runResolutionSelect - sebelumnya resolusi Run Mode selalu di-hardcode
+ * 1280x720 dan tidak bisa diubah operator.
+ */
+function startRunCamera() {
+  if (runStream) {
+    runStream.getTracks().forEach(function (t) { t.stop(); });
+    runStream = null;
+  }
+
+  const resSelect = document.getElementById('runResolutionSelect');
+  const resValue = (resSelect && resSelect.value) || '1280x720';
+  const [w, h] = resValue.split('x').map(Number);
+
+  navigator.mediaDevices.getUserMedia({ video: { width: { ideal: w }, height: { ideal: h } } }).then(function (stream) {
+    runStream = stream;
+    const runVideoEl = document.getElementById('runVideo');
+    runVideoEl.muted = true; // wajib agar autoplay tidak diblokir browser
+    runVideoEl.srcObject = stream;
+    runVideoEl.play().catch(function (playErr) { console.warn('video.play() gagal:', playErr); });
+  }).catch(function (err) {
+    alert('Gagal mengakses kamera untuk Run Mode: ' + err.message);
+  });
 }
 
 let runPollingActive = false;
