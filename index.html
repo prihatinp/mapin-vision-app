@@ -21,10 +21,9 @@
 <div id="loginScreen" class="login-screen d-flex align-items-center justify-content-center">
   <div class="login-card glass-card">
     <div class="text-center mb-4">
-      <img src="https://www.gstatic.com/images/branding/product/2x/apps_script_48dp.png" class="logo-placeholder" alt="MAP-IN Vision">
-      <h2 class="brand-title">MAP-IN <span class="text-accent">VISION</span></h2>
-      <p class="brand-tagline">Intelligent Eyes for Manufacturing</p>
-      <p class="text-muted small">Musashi Indonesia</p>
+      <div class="login-logo-box">
+        <img src="img/logo-mapin-vision.png" alt="MAP-IN Vision - Musashi Indonesia" class="login-logo-img">
+      </div>
     </div>
     <form id="loginForm">
       <div class="mb-3">
@@ -49,10 +48,8 @@
   <!-- SIDEBAR -->
   <nav class="sidebar" id="sidebarNav">
     <div class="sidebar-brand">
-      <span class="material-icons brand-icon">visibility</span>
-      <div>
-        <div class="brand-name">MAP-IN VISION</div>
-        <div class="brand-sub">Musashi Indonesia</div>
+      <div class="sidebar-logo-box">
+        <img src="img/logo-mapin-vision.png" alt="MAP-IN Vision - Musashi Indonesia" class="sidebar-logo-img">
       </div>
     </div>
     <ul class="nav-menu">
@@ -525,11 +522,13 @@
       <section id="view-run" class="view d-none">
         <div class="run-mode-wrapper">
           <div class="run-preview glass-card">
-            <video id="runVideo" autoplay playsinline muted></video>
+            <video id="runVideo" autoplay playsinline muted class="d-none"></video>
+            <img id="runTestImagePreview" class="d-none" style="width:100%; border-radius:var(--radius-md); background:#000; display:block;">
             <canvas id="runOverlay"></canvas>
             <div id="runDecisionBadge" class="run-decision-badge">READY</div>
-            <div id="runCameraOffOverlay" class="d-none" style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,.75); color:#fff; border-radius:var(--radius-md);">
-              <span class="material-icons align-middle me-2">videocam_off</span> Kamera dimatikan
+            <div id="runCameraOffOverlay" style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,.75); color:#fff; border-radius:var(--radius-md); text-align:center; flex-direction:column; gap:.5rem;">
+              <span class="material-icons" style="font-size:36px;">videocam_off</span>
+              <span>Kamera belum menyala.<br>Klik "Nyalakan Kamera (Live)" di panel kanan, atau upload gambar test untuk mulai mengukur.</span>
             </div>
           </div>
           <div class="run-sidepanel glass-card">
@@ -557,7 +556,7 @@
               <option value="1280x720" selected>1280 x 720</option>
               <option value="1920x1080">1920 x 1080</option>
             </select>
-            <button id="btnRunStopCamera" class="btn btn-sm btn-outline-danger w-100 mb-3">Matikan Kamera</button>
+            <button id="btnRunStopCamera" class="btn btn-sm btn-outline-success w-100 mb-3">Nyalakan Kamera (Live)</button>
 
             <div class="run-counter"><span>OK</span><strong id="runOkCount">0</strong></div>
             <div class="run-counter"><span>NG</span><strong id="runNgCount">0</strong></div>
@@ -566,8 +565,8 @@
             <div id="runNgDetail" class="small text-danger"></div>
             <div class="d-grid gap-2 mt-2 mb-3">
               <button id="btnPause" class="btn btn-outline-secondary btn-sm">Pause Trigger</button>
-              <button id="btnRecapture" class="btn btn-outline-primary btn-sm">Re-capture Manual</button>
-              <button id="btnRunUploadImage" class="btn btn-outline-info btn-sm"><span class="material-icons align-middle" style="font-size:16px;">upload_file</span> Uji Coba dari Gambar (Upload)</button>
+              <button id="btnRecapture" class="btn btn-primary btn-sm">Measure (Trigger 1x)</button>
+              <button id="btnRunUploadImage" class="btn btn-outline-info btn-sm"><span class="material-icons align-middle" style="font-size:16px;">upload_file</span> Upload Gambar Test</button>
               <input type="file" id="runUploadImageInput" accept="image/*" class="d-none">
               <p id="runUploadImageStatus" class="small text-muted mb-0"></p>
             </div>

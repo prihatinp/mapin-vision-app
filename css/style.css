@@ -46,6 +46,11 @@ body{
 .login-card{ width:380px; padding:2.5rem; }
 .logo-placeholder{ width:48px; opacity:.9; }
 .brand-title{ font-weight:800; color:#fff; letter-spacing:1px; }
+/* Logo resmi MAP-IN Vision (Musashi Indonesia) - gambarnya sendiri sudah
+   memuat nama produk + tagline, jadi dipasang di kotak putih supaya
+   terbaca jelas di atas kartu login yang bertema gelap. */
+.login-logo-box{ background:#fff; border-radius:14px; padding:1rem 1.25rem; display:inline-block; box-shadow:0 4px 16px rgba(0,0,0,.25); }
+.login-logo-img{ max-width:280px; width:100%; height:auto; display:block; }
 .text-accent{ color:#ff6b6b; }
 .brand-tagline{ color:#7fb8ff; font-size:.85rem; font-style:italic; }
 .login-card .text-muted{ color:var(--c-text-muted) !important; }
@@ -58,10 +63,14 @@ body{
   color:#fff; display:flex; flex-direction:column; padding:1.25rem 0;
   position:sticky; top:0; height:100vh;
 }
-.sidebar-brand{ display:flex; align-items:center; gap:.6rem; padding:0 1.25rem 1.25rem; border-bottom:1px solid rgba(255,255,255,.15); }
+.sidebar-brand{ padding:1.1rem 1.1rem 1.25rem; border-bottom:1px solid rgba(255,255,255,.15); }
 .brand-icon{ font-size:32px; color:var(--c-accent); }
 .brand-name{ font-weight:700; font-size:.95rem; letter-spacing:.5px; }
 .brand-sub{ font-size:.7rem; opacity:.7; }
+/* Logo resmi MAP-IN Vision di sidebar - kotak putih supaya logo (yang
+   dibuat dengan latar putih) tetap terbaca jelas di atas sidebar gelap. */
+.sidebar-logo-box{ background:#fff; border-radius:10px; padding:.55rem .7rem; }
+.sidebar-logo-img{ width:100%; height:auto; display:block; }
 
 .nav-menu{ list-style:none; padding:1rem 0; margin:0; flex:1; overflow-y:auto; }
 .nav-menu li{
@@ -150,6 +159,26 @@ body{
 .run-decision-badge.ng{ background:var(--c-accent); }
 .run-sidepanel{ flex:1; padding:1.25rem; }
 .run-counter{ display:flex; justify-content:space-between; padding:.5rem 0; border-bottom:1px dashed var(--c-card-border); }
+
+/* Bar "Hasil Ukur" ala Keyence VS Series - di bawah tiap slider parameter
+   di panel "Adjusting Judge OK/NG". Warna hijau/merah diisi live oleh
+   updateJudgeValueBars() di visionTools.js setiap selesai 1 siklus/Measure. */
+.judge-value-bar-track{
+  position:relative; height:20px; border-radius:6px; background:rgba(255,255,255,.06);
+  border:1px solid var(--c-card-border); margin:.3rem 0 .6rem; overflow:hidden;
+}
+.judge-value-bar-fill{
+  position:absolute; top:0; left:0; bottom:0; width:0%; background:#666;
+  transition:width .2s ease, background-color .2s ease;
+}
+.judge-value-bar-fill.ok{ background:var(--c-success); }
+.judge-value-bar-fill.ng{ background:#ff6b6b; }
+.judge-value-bar-label{
+  position:relative; z-index:1; font-size:.7rem; font-weight:700; color:var(--c-text);
+  display:flex; align-items:center; justify-content:center; height:100%;
+  text-shadow:0 1px 2px rgba(0,0,0,.6);
+}
+.judge-adjust-slider{ accent-color:var(--c-primary); }
 
 /* ---------- Dashboard (tema gelap, khusus isi halaman Dashboard -
    sidebar/topbar TETAP tema terang seperti biasa) ---------- */
