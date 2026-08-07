@@ -444,6 +444,66 @@ let runStream = null;
 let pollIntervalId = null; // trigger EXTERNAL (polling status IO)
 let internalTriggerIntervalId = null; // trigger INTERNAL (timer capture otomatis)
 
+/**
+ * Gambar uji-coba yang diupload lewat tombol "Uji Coba dari Gambar
+ * (Upload)" - kalau terisi (bukan null), 1 siklus inspeksi BERIKUTNYA
+ * akan memakai gambar ini sebagai pengganti frame kamera live, lalu
+ * langsung dikosongkan lagi setelah dipakai (single-shot), supaya
+ * siklus-siklus selanjutnya otomatis kembali memakai kamera seperti
+ * biasa. Ini dibuat khusus untuk keperluan latihan/demo tool tanpa
+ * harus print/tampilkan gambar contoh ke layar HP dan arahkan kamera
+ * ke situ - operator/engineer bisa langsung upload file gambar contoh
+ * (mis. dari paket contoh OK/NG) dan lihat hasil judge OK/NG-nya.
+ */
+let runTestImageOverride = null;
+
+function initRunUploadImageControls() {
+  const btn = document.getElementById('btnRunUploadImage');
+  const input = document.getElementById('runUploadImageInput');
+  const statusEl = document.getElementById('runUploadImageStatus');
+  if (!btn || !input) return;
+
+  btn.onclick = function () { input.click(); };
+  input.onchange = function (e) {
+    const file = e.target.files && e.target.files[0];
+    input.value = ''; // supaya file yang sama bisa dipilih ulang
+    if (!file) return;
+    if (!file.type || file.type.indexOf('image/') !== 0) {
+      if (statusEl) statusEl.innerText = 'File yang dipilih bukan gambar.';
+      return;
+    }
+    if (!ACTIVE_RECIPE) {
+      alert('Belum ada recipe aktif. Aktifkan recipe dulu di Recipe Management sebelum uji coba.');
+      return;
+    }
+    if (statusEl) statusEl.innerText = 'Memuat gambar...';
+
+    const reader = new FileReader();
+    reader.onload = function (ev) {
+      const img = new Image();
+      img.onload = function () {
+        const tmp = document.createElement('canvas');
+        tmp.width = img.naturalWidth;
+        tmp.height = img.naturalHeight;
+        tmp.getContext('2d').drawImage(img, 0, 0);
+        runTestImageOverride = tmp;
+        if (statusEl) statusEl.innerText = 'Menguji gambar "' + file.name + '"...';
+        runInspectionCycle().then(function () {
+          if (statusEl) statusEl.innerText = 'Hasil uji untuk "' + file.name + '" muncul di atas. Siklus berikutnya kembali memakai kamera live.';
+        });
+      };
+      img.onerror = function () {
+        if (statusEl) statusEl.innerText = 'Gagal membaca file gambar tersebut.';
+      };
+      img.src = ev.target.result;
+    };
+    reader.onerror = function () {
+      if (statusEl) statusEl.innerText = 'Gagal membaca file dari device.';
+    };
+    reader.readAsDataURL(file);
+  };
+}
+
 function initRunMode() {
   startRunCamera();
 
@@ -494,6 +554,7 @@ function initRunMode() {
   };
   document.getElementById('btnRecapture').onclick = runInspectionCycle;
 
+  initRunUploadImageControls();
   initTriggerModeControls();
   initJudgeAdjustPanel();
 
@@ -740,11 +801,23 @@ async function runInspectionCycle() {
 
   const startMs = performance.now();
 
-  const video = document.getElementById('runVideo');
-  const fullCanvas = document.createElement('canvas');
-  fullCanvas.width = video.videoWidth;
-  fullCanvas.height = video.videoHeight;
-  fullCanvas.getContext('2d').drawImage(video, 0, 0);
+  // Sumber frame: NORMALNYA dari video kamera live, TAPI kalau ada
+  // runTestImageOverride terisi (lewat tombol "Uji Coba dari Gambar
+  // Upload"), pakai gambar itu untuk SATU siklus ini saja, lalu
+  // langsung dikosongkan lagi supaya siklus berikutnya otomatis
+  // kembali ke kamera live seperti biasa.
+  let fullCanvas;
+  if (runTestImageOverride) {
+    fullCanvas = runTestImageOverride;
+    runTestImageOverride = null;
+  } else {
+    const video = document.getElementById('runVideo');
+    if (!video.videoWidth) { console.warn('Kamera Run Mode belum siap/menyala, siklus inspeksi dilewati.'); return; }
+    fullCanvas = document.createElement('canvas');
+    fullCanvas.width = video.videoWidth;
+    fullCanvas.height = video.videoHeight;
+    fullCanvas.getContext('2d').drawImage(video, 0, 0);
+  }
 
   const overlay = document.getElementById('runOverlay');
   overlay.width = fullCanvas.width;
@@ -796,7 +869,7 @@ async function runInspectionCycle() {
 
   const clientProcessingMs = performance.now() - startMs;
 
-  callApi('apiRunInspection', [{
+  return callApi('apiRunInspection', [{
     imageBase64: fullCanvas.toDataURL('image/jpeg', 0.85),
     recipeId: ACTIVE_RECIPE.id,
     toolResults: toolResults,
