@@ -102,6 +102,7 @@
             <div class="camera-preview-card glass-card">
               <div id="cameraZoomWrapper">
                 <video id="cameraPreview" autoplay playsinline muted></video>
+                <img id="ethernetCameraImg" class="d-none" style="width:100%; border-radius:var(--radius-md); display:block; background:#000;">
                 <img id="frozenFrameImg" class="d-none" style="width:100%; border-radius:var(--radius-md); display:block;">
                 <img id="referenceGhostImg" class="d-none">
                 <canvas id="cameraOverlay"></canvas>
@@ -118,14 +119,37 @@
           <div class="col-md-4">
             <div class="glass-card p-3">
               <h6>Pengaturan Kamera</h6>
-              <label class="form-label small">Sumber Kamera</label>
-              <select id="cameraSourceSelect" class="form-select mb-2"></select>
-              <label class="form-label small">Resolusi</label>
-              <select id="resolutionSelect" class="form-select mb-2">
-                <option value="640x480">640 x 480</option>
-                <option value="1280x720" selected>1280 x 720</option>
-                <option value="1920x1080">1920 x 1080</option>
-              </select>
+              <label class="form-label small">Tipe Kamera</label>
+              <div class="btn-group w-100 mb-2" role="group" id="cameraTypeRadios">
+                <input type="radio" class="btn-check" name="cameraTypeRadio" id="cameraTypeLaptop" value="laptop" checked>
+                <label class="btn btn-outline-primary btn-sm" for="cameraTypeLaptop">Laptop</label>
+                <input type="radio" class="btn-check" name="cameraTypeRadio" id="cameraTypeUsb" value="usb">
+                <label class="btn btn-outline-primary btn-sm" for="cameraTypeUsb">USB</label>
+                <input type="radio" class="btn-check" name="cameraTypeRadio" id="cameraTypeEthernet" value="ethernet">
+                <label class="btn btn-outline-primary btn-sm" for="cameraTypeEthernet">Ethernet</label>
+              </div>
+
+              <div id="deviceCameraControls">
+                <label class="form-label small">Sumber Kamera</label>
+                <select id="cameraSourceSelect" class="form-select mb-2"></select>
+                <label class="form-label small">Resolusi</label>
+                <select id="resolutionSelect" class="form-select mb-2">
+                  <option value="640x480">640 x 480</option>
+                  <option value="1280x720" selected>1280 x 720</option>
+                  <option value="1920x1080">1920 x 1080</option>
+                </select>
+              </div>
+
+              <div id="ethernetCameraControls" class="d-none">
+                <label class="form-label small">URL Stream Kamera Ethernet (MJPEG/HTTP)</label>
+                <input type="text" id="ethernetCameraUrl" class="form-control form-control-sm mb-2" placeholder="mis. http://192.168.1.50/video">
+                <div class="d-flex gap-2 mb-2">
+                  <button id="btnConnectEthernet" class="btn btn-sm btn-primary flex-fill">Sambungkan</button>
+                  <button id="btnDisconnectEthernet" class="btn btn-sm btn-outline-secondary flex-fill" disabled>Putuskan</button>
+                </div>
+                <p class="small text-muted mb-2">Isi alamat stream MJPEG dari kamera IP/ethernet Anda (biasanya tertera di manual kamera, contoh: <code>http://ALAMAT-IP/video</code> atau <code>http://ALAMAT-IP:8080/stream</code>). Kamera harus berada di jaringan/WiFi yang sama dengan perangkat ini. Catatan: kalau aplikasi ini dibuka lewat alamat <b>https://</b> (mis. GitHub Pages), browser bisa memblokir stream <b>http://</b> biasa (mixed content) - kalau stream tidak muncul, coba kamera yang mendukung https, atau hubungi Admin untuk solusi jaringan.</p>
+              </div>
+
               <label class="form-label small d-flex justify-content-between">Exposure <span id="exposureValue" class="text-muted">0</span></label>
               <input type="range" id="exposureRange" class="form-range" min="-10" max="10" value="0">
               <label class="form-label small d-flex justify-content-between">Brightness <span id="brightnessValue" class="text-muted">0</span></label>

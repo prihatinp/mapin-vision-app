@@ -5,6 +5,53 @@
 
 let currentStream = null;
 
+/* ==================================================================
+   TIPE KAMERA - Laptop (bawaan) / USB / Ethernet (IP Camera)
+   Browser tidak punya cara resmi membedakan kamera "bawaan laptop" vs
+   "USB" (keduanya sama-sama muncul sebagai videoinput lewat
+   enumerateDevices()) - pembedaan di sini dilakukan lewat pencocokan
+   kata kunci pada label device (mis. "USB", "Integrated", "Built-in"),
+   yang tergantung driver/OS masing-masing komputer. Kalau labelnya
+   tidak cocok kategori manapun, kamera tetap ditampilkan supaya tidak
+   ada kamera yang "hilang" dari pilihan.
+   Kamera Ethernet (IP Camera di jaringan LAN/WiFi) BUKAN diakses lewat
+   getUserMedia (itu API khusus kamera yang tercolok fisik ke
+   komputer) - melainkan lewat URL stream MJPEG yang ditampilkan
+   memakai elemen <img>, karena kamera ethernet punya server video
+   sendiri yang diakses lewat HTTP.
+   ================================================================== */
+let cameraMode = 'laptop'; // 'laptop' | 'usb' | 'ethernet'
+let ethernetActive = false;
+
+function isCameraActive() {
+  return !!currentStream || ethernetActive;
+}
+
+function _matchesDeviceType(label, type) {
+  const l = (label || '').toLowerCase();
+  if (type === 'usb') return /usb/.test(l);
+  if (type === 'laptop') return /(integrated|built-?in|internal|facetime|laptop)/.test(l) || !/usb/.test(l);
+  return true;
+}
+
+function onCameraTypeChange() {
+  const checked = document.querySelector('input[name="cameraTypeRadio"]:checked');
+  cameraMode = checked ? checked.value : 'laptop';
+
+  stopCamera(); // matikan dulu kamera/stream yang lagi aktif sebelum ganti tipe
+
+  const deviceControls = document.getElementById('deviceCameraControls');
+  const ethernetControls = document.getElementById('ethernetCameraControls');
+  if (cameraMode === 'ethernet') {
+    deviceControls.classList.add('d-none');
+    ethernetControls.classList.remove('d-none');
+  } else {
+    deviceControls.classList.remove('d-none');
+    ethernetControls.classList.add('d-none');
+    populateCameraList();
+  }
+}
+
 function initCameraCenter() {
   populateCameraList();
   document.getElementById('btnCapture').addEventListener('click', handleSingleShotClick);
@@ -12,11 +59,19 @@ function initCameraCenter() {
   document.getElementById('cameraSourceSelect').addEventListener('change', startSelectedCamera);
   document.getElementById('resolutionSelect').addEventListener('change', startSelectedCamera);
 
+  document.querySelectorAll('input[name="cameraTypeRadio"]').forEach(function (radio) {
+    radio.addEventListener('change', onCameraTypeChange);
+  });
+  document.getElementById('btnConnectEthernet').onclick = connectEthernetCamera;
+  document.getElementById('btnDisconnectEthernet').onclick = stopCamera;
+
   const btnStop = document.getElementById('btnStopCamera');
   if (btnStop) {
     btnStop.onclick = function () {
-      if (currentStream) {
+      if (isCameraActive()) {
         stopCamera();
+      } else if (cameraMode === 'ethernet') {
+        connectEthernetCamera();
       } else {
         startSelectedCamera(); // kamera sedang mati -> tombol ini jadi "Nyalakan Kamera"
       }
@@ -46,7 +101,7 @@ function initCameraCenter() {
 let frozenFrameBase64 = null;
 
 function handleSingleShotClick() {
-  if (!currentStream) {
+  if (!isCameraActive()) {
     alert('Kamera sedang mati. Klik "Nyalakan Kamera" terlebih dahulu.');
     return;
   }
@@ -56,11 +111,11 @@ function handleSingleShotClick() {
 function freezeFrame(base64) {
   frozenFrameBase64 = base64;
   const video = document.getElementById('cameraPreview');
+  const ethImg = document.getElementById('ethernetCameraImg');
   const img = document.getElementById('frozenFrameImg');
-  video.pause();
+  if (cameraMode === 'ethernet') { ethImg.classList.add('d-none'); } else { video.pause(); video.classList.add('d-none'); }
   img.src = base64;
   img.classList.remove('d-none');
-  video.classList.add('d-none');
   document.getElementById('frozenFrameBadge').classList.remove('d-none');
   document.getElementById('cameraLiveControls').classList.add('d-none');
   document.getElementById('cameraFrozenControls').classList.remove('d-none');
@@ -71,16 +126,19 @@ function freezeFrame(base64) {
 function resumeLiveView() {
   frozenFrameBase64 = null;
   const video = document.getElementById('cameraPreview');
+  const ethImg = document.getElementById('ethernetCameraImg');
   const img = document.getElementById('frozenFrameImg');
   img.classList.add('d-none');
-  video.classList.remove('d-none');
   document.getElementById('frozenFrameBadge').classList.add('d-none');
   document.getElementById('cameraLiveControls').classList.remove('d-none');
   document.getElementById('cameraFrozenControls').classList.add('d-none');
-  if (currentStream) {
-    video.play().catch(function (playErr) { console.warn('video.play() gagal:', playErr); });
-    document.getElementById('cameraStatusText').innerText = 'Kamera aktif.';
+  if (cameraMode === 'ethernet') {
+    if (ethernetActive) ethImg.classList.remove('d-none');
+  } else {
+    video.classList.remove('d-none');
+    if (currentStream) video.play().catch(function (playErr) { console.warn('video.play() gagal:', playErr); });
   }
+  if (isCameraActive()) document.getElementById('cameraStatusText').innerText = 'Kamera aktif.';
 }
 
 function handleSaveFrozenFrame() {
@@ -195,7 +253,7 @@ function initDatasetCapture() {
       saveFrameToDataset(frozenFrameBase64, function (ok) { if (ok) resumeLiveView(); });
       return;
     }
-    if (!currentStream) {
+    if (!isCameraActive()) {
       alert('Kamera sedang mati. Klik "Nyalakan Kamera" terlebih dahulu.');
       return;
     }
@@ -267,6 +325,17 @@ function stopCamera() {
   const video = document.getElementById('cameraPreview');
   if (video) video.srcObject = null;
 
+  if (ethernetActive) {
+    const ethImg = document.getElementById('ethernetCameraImg');
+    ethImg.src = '';
+    ethImg.classList.add('d-none');
+    ethernetActive = false;
+    const btnConnect = document.getElementById('btnConnectEthernet');
+    const btnDisconnect = document.getElementById('btnDisconnectEthernet');
+    if (btnConnect) btnConnect.disabled = false;
+    if (btnDisconnect) btnDisconnect.disabled = true;
+  }
+
   const btnStop = document.getElementById('btnStopCamera');
   if (btnStop) { btnStop.innerText = 'Nyalakan Kamera'; btnStop.classList.replace('btn-outline-danger', 'btn-outline-success'); }
   const statusText = document.getElementById('cameraStatusText');
@@ -277,24 +346,35 @@ function stopCamera() {
 
 /**
  * Enumerasi device kamera yang tersedia (webcam PC / kamera smartphone
- * jika diakses dari browser mobile - environment.facingMode 'environment').
+ * jika diakses dari browser mobile - environment.facingMode 'environment'),
+ * lalu disaring sesuai Tipe Kamera yang dipilih (Laptop/USB). Lihat catatan
+ * di _matchesDeviceType() soal keterbatasan pembedaan Laptop vs USB.
  */
 function populateCameraList() {
   navigator.mediaDevices.enumerateDevices().then(function (devices) {
     const select = document.getElementById('cameraSourceSelect');
     select.innerHTML = '';
     const videoInputs = devices.filter(function (d) { return d.kind === 'videoinput'; });
-    videoInputs.forEach(function (d, idx) {
+    let filtered = videoInputs.filter(function (d) { return _matchesDeviceType(d.label, cameraMode); });
+    if (filtered.length === 0) filtered = videoInputs; // jangan sampai daftar kosong kalau label tidak cocok kategori manapun
+    filtered.forEach(function (d, idx) {
       const opt = document.createElement('option');
       opt.value = d.deviceId;
       opt.text = d.label || ('Kamera ' + (idx + 1));
       select.appendChild(opt);
     });
+    if (filtered.length === 0) {
+      const statusText = document.getElementById('cameraStatusText');
+      if (statusText) statusText.innerText = 'Tidak ada kamera ' + (cameraMode === 'usb' ? 'USB' : 'laptop') + ' yang terdeteksi.';
+      return;
+    }
     startSelectedCamera();
   });
 }
 
 function startSelectedCamera() {
+  if (cameraMode === 'ethernet') return; // kamera ethernet dimulai lewat connectEthernetCamera(), bukan di sini
+
   const deviceId = document.getElementById('cameraSourceSelect').value;
   const [w, h] = document.getElementById('resolutionSelect').value.split('x').map(Number);
 
@@ -337,18 +417,73 @@ function startSelectedCamera() {
   });
 }
 
-function captureSingleShot() {
+/* ==================================================================
+   KAMERA ETHERNET (IP Camera lewat jaringan LAN/WiFi)
+   Berbeda dari kamera Laptop/USB (dicolok fisik, diakses via
+   getUserMedia), kamera Ethernet punya server video sendiri di
+   jaringan yang di-stream lewat protokol HTTP (MJPEG). Browser tidak
+   bisa "meminta izin" ke kamera ethernet seperti webcam - cukup
+   tampilkan URL stream-nya di elemen <img>, yang otomatis update terus
+   selama server MJPEG mengirim frame baru.
+   ================================================================== */
+function connectEthernetCamera() {
+  const urlInput = document.getElementById('ethernetCameraUrl');
+  const url = (urlInput.value || '').trim();
+  if (!url) { alert('Isi dulu URL stream kamera Ethernet, mis. http://192.168.1.50/video'); return; }
+
+  if (currentStream) { currentStream.getTracks().forEach(function (t) { t.stop(); }); currentStream = null; }
+
+  const ethImg = document.getElementById('ethernetCameraImg');
   const video = document.getElementById('cameraPreview');
+  video.classList.add('d-none');
+
+  const statusText = document.getElementById('cameraStatusText');
+  if (statusText) statusText.innerText = 'Menyambungkan ke kamera Ethernet...';
+
+  ethImg.onload = function () {
+    ethernetActive = true;
+    ethImg.classList.remove('d-none');
+    document.getElementById('cameraOverlay').width = ethImg.naturalWidth || 640;
+    document.getElementById('cameraOverlay').height = ethImg.naturalHeight || 480;
+    if (typeof applyCameraAdjustments === 'function') applyCameraAdjustments();
+    if (typeof redrawGridOverlay === 'function') redrawGridOverlay();
+    if (typeof startAuxiliaryLoops === 'function') startAuxiliaryLoops(); // histogram tetap jalan; FPS presisi tidak tersedia untuk stream MJPEG lewat <img>
+
+    document.getElementById('btnConnectEthernet').disabled = true;
+    document.getElementById('btnDisconnectEthernet').disabled = false;
+    const btnStop = document.getElementById('btnStopCamera');
+    if (btnStop) { btnStop.innerText = 'Matikan Kamera'; btnStop.classList.replace('btn-outline-success', 'btn-outline-danger'); }
+    if (statusText) statusText.innerText = 'Kamera Ethernet tersambung.';
+  };
+  ethImg.onerror = function () {
+    ethernetActive = false;
+    if (statusText) statusText.innerText = 'Gagal menyambungkan ke kamera Ethernet. Cek URL, jaringan, atau kemungkinan stream http:// diblokir karena halaman ini https:// (mixed content).';
+  };
+  ethImg.src = url;
+}
+
+/** Mengambil elemen sumber gambar yang sedang aktif (video atau <img> ethernet) beserta ukurannya. */
+function _getActiveFrameSource() {
+  if (cameraMode === 'ethernet') {
+    const img = document.getElementById('ethernetCameraImg');
+    return { el: img, w: img.naturalWidth, h: img.naturalHeight };
+  }
+  const video = document.getElementById('cameraPreview');
+  return { el: video, w: video.videoWidth, h: video.videoHeight };
+}
+
+function captureSingleShot() {
+  const src = _getActiveFrameSource();
   const canvas = document.createElement('canvas');
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
+  canvas.width = src.w;
+  canvas.height = src.h;
   const ctx = canvas.getContext('2d');
   // Terapkan filter Exposure/Brightness/Contrast yang sama seperti di
   // preview, supaya hasil capture konsisten dengan yang terlihat di layar
   // (sebelumnya capture selalu mengambil gambar mentah kamera, mengabaikan
   // pengaturan slider walau slider-nya sudah digeser).
   ctx.filter = buildCameraFilterString(_getCameraAdjustValues());
-  ctx.drawImage(video, 0, 0);
+  ctx.drawImage(src.el, 0, 0, canvas.width, canvas.height);
   const base64 = canvas.toDataURL('image/jpeg', 0.9);
   return base64;
 }
@@ -446,7 +581,7 @@ function initReferenceImage() {
   if (!btnSave) return;
 
   btnSave.onclick = function () {
-    if (!currentStream) { alert('Kamera sedang mati. Klik "Nyalakan Kamera" terlebih dahulu.'); return; }
+    if (!isCameraActive()) { alert('Kamera sedang mati. Klik "Nyalakan Kamera" terlebih dahulu.'); return; }
     const base64 = frozenFrameBase64 || captureSingleShot();
     document.getElementById('referenceGhostImg').src = base64;
     toggle.disabled = false;
@@ -488,15 +623,17 @@ let _histogramIntervalId = null;
 
 function startAuxiliaryLoops() {
   stopAuxiliaryLoops(); // pastikan tidak dobel kalau dipanggil berkali-kali (ganti sumber/resolusi kamera)
-  _fpsLoopActive = true;
   _fpsFrameCount = 0;
   _fpsLastUpdate = 0;
 
   const video = document.getElementById('cameraPreview');
-  if ('requestVideoFrameCallback' in video) {
+  // Stream MJPEG kamera Ethernet lewat <img> tidak punya requestVideoFrameCallback
+  // (API itu khusus elemen <video>), jadi FPS presisi tidak bisa dihitung untuk mode ini.
+  if (cameraMode !== 'ethernet' && 'requestVideoFrameCallback' in video) {
+    _fpsLoopActive = true;
     video.requestVideoFrameCallback(_onVideoFrame);
   } else {
-    updateCameraInfoBadge('-'); // browser tidak mendukung penghitungan FPS presisi
+    updateCameraInfoBadge('-');
   }
 
   _histogramIntervalId = setInterval(drawHistogram, 250);
@@ -521,17 +658,17 @@ function _onVideoFrame(now, metadata) {
 }
 
 function updateCameraInfoBadge(fpsText) {
-  const video = document.getElementById('cameraPreview');
   const badge = document.getElementById('cameraInfoBadge');
-  if (!badge || !video) return;
-  const w = video.videoWidth || 0, h = video.videoHeight || 0;
+  if (!badge) return;
+  const src = _getActiveFrameSource();
+  const w = src.w || 0, h = src.h || 0;
   badge.innerText = fpsText + ' FPS · ' + w + ' x ' + h;
 }
 
 function drawHistogram() {
-  if (!currentStream) return;
-  const video = document.getElementById('cameraPreview');
-  if (!video.videoWidth) return;
+  if (!isCameraActive()) return;
+  const src = _getActiveFrameSource();
+  if (!src.w) return;
 
   // Downscale ke ukuran kecil supaya perhitungan histogram ringan (tidak
   // perlu resolusi penuh untuk mendapat gambaran distribusi kecerahan).
@@ -540,7 +677,7 @@ function drawHistogram() {
   sampleCanvas.width = sampleW; sampleCanvas.height = sampleH;
   const sctx = sampleCanvas.getContext('2d');
   sctx.filter = buildCameraFilterString(_getCameraAdjustValues()); // ikutkan penyesuaian Exposure/Brightness/Contrast
-  sctx.drawImage(video, 0, 0, sampleW, sampleH);
+  sctx.drawImage(src.el, 0, 0, sampleW, sampleH);
 
   let pixels;
   try {
