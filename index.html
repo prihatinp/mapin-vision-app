@@ -53,15 +53,15 @@
       </div>
     </div>
     <ul class="nav-menu">
-      <li data-view="dashboard" class="active"><span class="material-icons">dashboard</span> Dashboard</li>
-      <li data-view="camera"><span class="material-icons">videocam</span> Camera Center</li>
-      <li data-view="recipe"><span class="material-icons">receipt_long</span> Recipe Management</li>
-      <li data-view="roiEditor"><span class="material-icons">crop_free</span> ROI Editor</li>
-      <li data-view="run"><span class="material-icons">play_circle</span> Run Mode</li>
-      <li data-view="aiCenter"><span class="material-icons">smart_toy</span> AI Detection Center</li>
-      <li data-view="ioMonitor"><span class="material-icons">memory</span> Arduino / ESP8266 IO</li>
-      <li data-view="history"><span class="material-icons">history</span> History & Traceability</li>
-      <li data-view="settings"><span class="material-icons">settings</span> Settings</li>
+      <li data-view="dashboard" class="active"><span class="material-icons">dashboard</span> <span class="nav-label">Dashboard</span></li>
+      <li data-view="camera"><span class="material-icons">videocam</span> <span class="nav-label">Camera Center</span></li>
+      <li data-view="recipe"><span class="material-icons">receipt_long</span> <span class="nav-label">Recipe Management</span></li>
+      <li data-view="roiEditor"><span class="material-icons">crop_free</span> <span class="nav-label">ROI Editor</span></li>
+      <li data-view="run"><span class="material-icons">play_circle</span> <span class="nav-label">Run Mode</span></li>
+      <li data-view="aiCenter"><span class="material-icons">smart_toy</span> <span class="nav-label">AI Detection Center</span></li>
+      <li data-view="ioMonitor"><span class="material-icons">memory</span> <span class="nav-label">Arduino / ESP8266 IO</span></li>
+      <li data-view="history"><span class="material-icons">history</span> <span class="nav-label">History & Traceability</span></li>
+      <li data-view="settings"><span class="material-icons">settings</span> <span class="nav-label">Settings</span></li>
     </ul>
     <div class="sidebar-footer">
       <button id="logoutBtn" class="btn btn-sm btn-outline-light w-100">
@@ -385,7 +385,17 @@
         <div class="row g-3">
           <div class="col-md-9">
             <div class="roi-canvas-card glass-card">
-              <canvas id="roiCanvas"></canvas>
+              <div class="d-flex gap-2 align-items-center mb-2">
+                <button id="btnRoiCaptureCamera" class="btn btn-sm btn-primary"><span class="material-icons align-middle" style="font-size:16px;">photo_camera</span> Ambil Gambar dari Kamera</button>
+                <span id="roiCaptureStatus" class="small text-muted"></span>
+              </div>
+              <div id="roiEmptyState" class="text-center text-muted py-5">
+                <span class="material-icons" style="font-size:48px; opacity:.4;">image</span>
+                <p class="mb-0 mt-2">Belum ada gambar referensi untuk digambar ROI-nya.</p>
+                <p class="small mb-0">Klik "Ambil Gambar dari Kamera" di atas, atau buka Camera Center/Run Mode dulu supaya ada frame kamera yang bisa dipakai di sini.</p>
+              </div>
+              <video id="roiCaptureVideo" class="d-none" autoplay playsinline muted></video>
+              <canvas id="roiCanvas" class="d-none"></canvas>
             </div>
           </div>
           <div class="col-md-3">
@@ -631,6 +641,18 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<!-- opencv.js dimuat "async" (file WASM besar, ~8-10MB) supaya tidak memblokir render
+     halaman - tapi ini berarti ada JEDA sebelum object `cv` benar-benar siap dipakai.
+     window.openCvReadyPromise (di-resolve oleh Module.onRuntimeInitialized) dipakai
+     runInspectionCycle() di visionTools.js untuk MENUNGGU opencv.js siap sebelum
+     memanggil tool yang butuh cv.* (Pattern Match, Blob, Edge/Dimension, Presence,
+     Color, Counting) - mencegah error "cv is not defined" kalau siklus inspeksi
+     pertama terpicu sebelum opencv.js selesai dimuat (mis. koneksi lambat). -->
+<script>
+  window.openCvReadyPromise = new Promise(function (resolve) {
+    window.Module = { onRuntimeInitialized: resolve };
+  });
+</script>
 <script src="https://docs.opencv.org/4.9.0/opencv.js" async></script>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.19.0/dist/ort.min.js"></script>

@@ -516,6 +516,14 @@ function stopRunMode() {
 
 async function runInspectionCycle() {
   if (!ACTIVE_RECIPE) return;
+
+  // Pastikan opencv.js sudah selesai dimuat sebelum dipakai (lihat catatan di
+  // index.html soal window.openCvReadyPromise) - kalau siklus pertama terpicu
+  // terlalu cepat (mis. koneksi lambat), tool berbasis cv.* akan error kalau
+  // tidak menunggu ini dulu. Await pada promise yang sudah resolve = instan,
+  // jadi aman dipanggil di setiap siklus, tidak cuma yang pertama.
+  if (window.openCvReadyPromise) await window.openCvReadyPromise;
+
   const startMs = performance.now();
 
   const video = document.getElementById('runVideo');

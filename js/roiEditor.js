@@ -94,7 +94,11 @@ function initRoiEditor() {
     alert('Template referensi diambil dari ' + roi.name + '. Klik "+ Tambah Tool ke ROI" untuk menyimpannya sebagai Pattern Match tool.');
   };
 
-  // Ambil 1 frame terbaru dari kamera sebagai referensi background
+  // Ambil 1 frame terbaru dari kamera Camera Center/Run Mode (kalau sedang
+  // aktif) sebagai referensi background. Kalau tidak ada (mis. user langsung
+  // buka ROI Editor dari Recipe Baru tanpa lewat Camera Center dulu),
+  // tampilkan empty-state + tombol "Ambil Gambar dari Kamera" di bawah,
+  // bukan kanvas kosong/hitam yang membingungkan seperti sebelumnya.
   const previewVideo = document.getElementById('runVideo') || document.getElementById('cameraPreview');
   if (previewVideo && previewVideo.videoWidth) {
     const tmp = document.createElement('canvas');
@@ -104,10 +108,8 @@ function initRoiEditor() {
     backgroundImage = tmp;
     canvas.width = tmp.width;
     canvas.height = tmp.height;
-  } else {
-    canvas.width = 1280;
-    canvas.height = 720;
   }
+  _updateRoiEmptyState();
 
   renderRoiList();
   redrawCanvas();
@@ -117,7 +119,14 @@ function initRoiEditor() {
   canvas.addEventListener('mouseup', function () { draggingPointIndex = -1; });
   canvas.addEventListener('dblclick', onCanvasDoubleClick);
 
+  const btnRoiCaptureCamera = document.getElementById('btnRoiCaptureCamera');
+  if (btnRoiCaptureCamera) btnRoiCaptureCamera.onclick = captureRoiReferenceFromCamera;
+
   document.getElementById('btnAddRoi').onclick = function () {
+    if (!backgroundImage) {
+      alert('Ambil gambar referensi dulu (tombol "Ambil Gambar dari Kamera" di atas) sebelum menambah ROI, supaya ROI-nya bisa digambar di atas gambar part yang benar.');
+      return;
+    }
     const name = 'ROI-' + (roiList.length + 1);
     roiList.push({ id: 'roi_' + Date.now(), name: name, points: [
       { x: 50, y: 50 }, { x: 200, y: 50 }, { x: 200, y: 200 }, { x: 50, y: 200 }
@@ -154,6 +163,72 @@ function initRoiEditor() {
   };
 
   renderToolList();
+}
+
+/** Toggle antara empty-state ("Belum ada gambar referensi") dan kanvas ROI. */
+function _updateRoiEmptyState() {
+  const emptyState = document.getElementById('roiEmptyState');
+  const canvas = document.getElementById('roiCanvas');
+  if (!emptyState || !canvas) return;
+  if (backgroundImage) {
+    emptyState.classList.add('d-none');
+    canvas.classList.remove('d-none');
+  } else {
+    emptyState.classList.remove('d-none');
+    canvas.classList.add('d-none');
+  }
+}
+
+/**
+ * Nyalakan kamera default browser sebentar SAAT DIBUTUHKAN saja, ambil 1
+ * frame sebagai gambar referensi untuk digambar ROI-nya, lalu langsung
+ * matikan lagi kameranya (tidak perlu tetap menyala di ROI Editor). Ini
+ * jalur alternatif kalau user membuka ROI Editor langsung (mis. dari
+ * "Recipe Baru") tanpa lewat Camera Center/Run Mode dulu, supaya tidak
+ * perlu bolak-balik menu hanya untuk dapat 1 gambar acuan.
+ */
+function captureRoiReferenceFromCamera() {
+  const btn = document.getElementById('btnRoiCaptureCamera');
+  const statusEl = document.getElementById('roiCaptureStatus');
+  const video = document.getElementById('roiCaptureVideo');
+  if (btn) btn.disabled = true;
+  if (statusEl) statusEl.innerText = 'Menyalakan kamera...';
+
+  navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false })
+    .then(function (stream) {
+      video.srcObject = stream;
+      video.muted = true;
+      return video.play().catch(function () { /* abaikan, browser tertentu tetap render walau play() ditolak */ });
+    })
+    .then(function () {
+      // Beri jeda singkat supaya frame video sempat ter-render sebelum di-capture
+      // (langsung capture di frame pertama kadang masih hitam/belum siap).
+      return new Promise(function (resolve) { setTimeout(resolve, 400); });
+    })
+    .then(function () {
+      const canvasEl = document.getElementById('roiCanvas');
+      const tmp = document.createElement('canvas');
+      tmp.width = video.videoWidth;
+      tmp.height = video.videoHeight;
+      tmp.getContext('2d').drawImage(video, 0, 0);
+      backgroundImage = tmp;
+      canvasEl.width = tmp.width;
+      canvasEl.height = tmp.height;
+
+      // Matikan kamera lagi - ROI Editor hanya butuh 1 foto diam, bukan live stream.
+      const stream = video.srcObject;
+      if (stream) stream.getTracks().forEach(function (t) { t.stop(); });
+      video.srcObject = null;
+
+      _updateRoiEmptyState();
+      redrawCanvas();
+      if (btn) btn.disabled = false;
+      if (statusEl) statusEl.innerText = 'Gambar referensi berhasil diambil.';
+    })
+    .catch(function (err) {
+      if (btn) btn.disabled = false;
+      if (statusEl) statusEl.innerText = 'Gagal mengakses kamera: ' + err.message;
+    });
 }
 
 function getDefaultParamsForTool(type) {

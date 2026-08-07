@@ -106,7 +106,12 @@ function showView(viewName) {
 
   document.querySelectorAll('.view').forEach(function (v) { v.classList.add('d-none'); });
   document.getElementById('view-' + viewName).classList.remove('d-none');
-  document.getElementById('viewTitle').innerText = document.querySelector('.nav-menu li[data-view="' + viewName + '"]').innerText.trim();
+  // Ambil teks label menu SAJA (span.nav-label), bukan seluruh isi <li> - sebelumnya
+  // innerText <li> ikut menyertakan nama ligature ikon Material Icons (mis. "receipt_long")
+  // sehingga judul halaman di topbar sempat tertulis 2 baris "receipt_long\nRecipe Management".
+  const navLi = document.querySelector('.nav-menu li[data-view="' + viewName + '"]');
+  const navLabel = navLi.querySelector('.nav-label');
+  document.getElementById('viewTitle').innerText = (navLabel ? navLabel.innerText : navLi.innerText).trim();
 
   if (viewName === 'dashboard') loadDashboard();
   if (viewName === 'camera') initCameraCenter();
