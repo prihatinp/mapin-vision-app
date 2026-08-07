@@ -22,6 +22,65 @@ function initCameraCenter() {
       }
     };
   }
+
+  initDatasetCapture();
+}
+
+/* ==================================================================
+   KUMPULKAN SAMPLE UNTUK DATASET AI (Labeling)
+   Berbeda dari Single Shot (hanya preview) dan Run Mode (butuh recipe
+   aktif) - fitur ini menyimpan foto ke Drive/Dataset/<label>/ dengan
+   label yang dipilih manual, untuk dipakai sebagai bahan labeling
+   bounding box di Roboflow/CVAT sebelum recipe/AI model dibuat.
+   ================================================================== */
+let datasetCaptureCount = 0;
+
+function initDatasetCapture() {
+  const labelSelect = document.getElementById('datasetLabelSelect');
+  const customInput = document.getElementById('datasetCustomLabel');
+  const btnCaptureDataset = document.getElementById('btnCaptureDataset');
+  if (!labelSelect || !btnCaptureDataset) return;
+
+  labelSelect.onchange = function () {
+    customInput.classList.toggle('d-none', labelSelect.value !== 'NG_lainnya');
+  };
+
+  btnCaptureDataset.onclick = function () {
+    if (!currentStream) {
+      alert('Kamera sedang mati. Klik "Nyalakan Kamera" terlebih dahulu.');
+      return;
+    }
+    let label = labelSelect.value;
+    if (label === 'NG_lainnya') {
+      const custom = (customInput.value || '').trim();
+      if (!custom) { alert('Isi kolom "Label Manual" terlebih dahulu untuk label "Lainnya".'); return; }
+      label = 'NG_' + custom.replace(/\s+/g, '_');
+    }
+
+    const base64 = captureSingleShot();
+    const statusEl = document.getElementById('datasetCaptureStatus');
+    btnCaptureDataset.disabled = true;
+    statusEl.className = 'small mt-2 text-muted';
+    statusEl.innerText = 'Menyimpan sample...';
+
+    callApi('apiSaveDatasetImage', [base64, label, CURRENT_SESSION]).then(function (res) {
+      btnCaptureDataset.disabled = false;
+      if (res.success) {
+        datasetCaptureCount++;
+        statusEl.className = 'small mt-2 text-success';
+        statusEl.innerText = 'Tersimpan sebagai "' + res.label + '".';
+        document.getElementById('datasetCaptureCounter').innerText =
+          'Total sample diambil sesi ini: ' + datasetCaptureCount + ' (tersimpan di Drive/Dataset/' + res.label + '/).';
+      } else {
+        statusEl.className = 'small mt-2 text-danger';
+        statusEl.innerText = 'Gagal menyimpan: ' + res.error;
+      }
+    }).catch(function (err) {
+      btnCaptureDataset.disabled = false;
+      statusEl.className = 'small mt-2 text-danger';
+      statusEl.innerText = 'Gagal menyimpan: ' + err.message;
+    });
+  };
 }
 
 /**

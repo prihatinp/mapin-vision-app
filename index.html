@@ -130,6 +130,39 @@
             </div>
           </div>
         </div>
+        <div class="row g-3 mt-1">
+          <div class="col-md-8">
+            <div class="glass-card p-3">
+              <h6>Kumpulkan Sample untuk Dataset AI (Labeling)</h6>
+              <p class="small text-muted mb-2">Gunakan ini untuk mengambil foto part satu per satu (OK maupun berbagai jenis NG) SEBELUM recipe/AI model dibuat, sebagai bahan data yang nanti diberi label bounding box di Roboflow/CVAT. Berbeda dari Run Mode (yang butuh recipe aktif), fitur ini hanya perlu kamera menyala dan label yang Anda pilih sendiri.</p>
+              <div class="row g-2 align-items-end">
+                <div class="col-md-5">
+                  <label class="form-label small">Label</label>
+                  <select id="datasetLabelSelect" class="form-select form-select-sm">
+                    <option value="OK">OK (Part Normal)</option>
+                    <option value="NG_scratch">NG - Scratch (Goresan)</option>
+                    <option value="NG_karat">NG - Karat</option>
+                    <option value="NG_dent">NG - Penyok (Dent)</option>
+                    <option value="NG_crack">NG - Retak (Crack)</option>
+                    <option value="NG_missing_part">NG - Bagian Hilang</option>
+                    <option value="NG_dirty_surface">NG - Kotor</option>
+                    <option value="NG_wrong_assembly">NG - Salah Rakit</option>
+                    <option value="NG_lainnya">NG - Lainnya (isi manual)</option>
+                  </select>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label small">Label Manual (jika pilih "Lainnya")</label>
+                  <input type="text" id="datasetCustomLabel" class="form-control form-control-sm d-none" placeholder="mis. NG_baret_dalam">
+                </div>
+                <div class="col-md-3 d-grid">
+                  <button id="btnCaptureDataset" class="btn btn-sm btn-success">Ambil &amp; Simpan Sample</button>
+                </div>
+              </div>
+              <div id="datasetCaptureStatus" class="small mt-2"></div>
+              <div id="datasetCaptureCounter" class="small text-muted mt-1"></div>
+            </div>
+          </div>
+        </div>
       </section>
 
       <!-- ================= RECIPE MANAGEMENT VIEW ================= -->

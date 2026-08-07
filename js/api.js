@@ -22,7 +22,7 @@
 // >>> WAJIB DIISI: URL Web App Apps Script Anda <<<
 // Ambil dari: Apps Script Editor -> Deploy -> Manage deployments -> salin
 // URL yang diakhiri "/exec" (BUKAN URL /dev, BUKAN URL editor).
-const API_BASE_URL = '//script.google.com/macros/s/AKfycby3ce2UMM4qQT2MTHl0Cm7X6Fxvg09459sHu612Cmk90fd9JncOyqnHw_pWsqXZl120KA/exec';
+const API_BASE_URL = 'https://script.google.com/macros/s/AKfycby3ce2UMM4qQT2MTHl0Cm7X6Fxvg09459sHu612Cmk90fd9JncOyqnHw_pWsqXZl120KA/exec';
 
 /**
  * Memanggil salah satu fungsi apiXxx() di Code.gs lewat HTTP POST.
