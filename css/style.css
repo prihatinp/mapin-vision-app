@@ -121,7 +121,15 @@ body{
 /* ---------- Camera / Run Mode ---------- */
 .camera-preview-card, .roi-canvas-card{ position:relative; padding:.5rem; overflow:hidden; }
 .camera-preview-card video{ width:100%; border-radius:var(--radius-md); background:#000; }
-#cameraOverlay, #runOverlay{ position:absolute; top:.5rem; left:.5rem; pointer-events:none; }
+/* BUG YANG DIPERBAIKI: canvas overlay ini di-set lebar/tinggi lewat JS
+   memakai UKURAN PIKSEL ASLI gambar/video (mis. 640x480), TAPI video/img
+   di baliknya di-scale CSS width:100% mengikuti lebar kartu (mis. ~900px)
+   - sehingga overlay terlihat sebagai "kotak ganda" lebih kecil menumpuk
+   di pojok kiri-atas gambar yang sudah membesar (persis yang terlihat di
+   screenshot "kepotong/dobel"). Fix: overlay ikut di-scale mengikuti lebar
+   video/img (dikurangi padding kartu .5rem kiri+kanan supaya presisi
+   menumpuk pas di atas video/img, bukan di atas padding kartunya). */
+#cameraOverlay, #runOverlay{ position:absolute; top:.5rem; left:.5rem; width:calc(100% - 1rem); height:auto; pointer-events:none; }
 
 /* Kanvas ROI Editor SEBELUMNYA dirender di ukuran piksel ASLI gambar
    (mis. 1920x1080) tanpa mengecil menyesuaikan lebar kartu, sehingga
@@ -179,6 +187,18 @@ body{
   text-shadow:0 1px 2px rgba(0,0,0,.6);
 }
 .judge-adjust-slider{ accent-color:var(--c-primary); }
+
+/* Panel "Adjusting Judge OK/NG" SEKARANG jadi kartu lebar sendiri di bawah
+   gambar preview Run Mode (sebelumnya sempit di sidepanel kanan) - jadi
+   slider & bar hasil ukurnya dibesarkan di sini supaya jelas terbaca dari
+   jarak jauh saat didemokan ke tim, mengikuti gaya tampilan hasil ukur
+   Keyence VS Series (nomor besar, bar tebal). */
+.run-judge-panel-wrap .judge-value-bar-track{ height:44px; border-radius:8px; margin:.5rem 0 1.25rem; }
+.run-judge-panel-wrap .judge-value-bar-label{ font-size:1.3rem; font-weight:800; }
+.run-judge-panel-wrap .judge-adjust-slider{ height:1.4rem; }
+.run-judge-panel-wrap input.judge-adjust-input{ font-size:1.05rem; font-weight:700; width:7rem !important; }
+.run-judge-panel-wrap label.form-label{ font-size:1rem; }
+.run-judge-panel-wrap .fw-bold{ font-size:1.1rem; }
 
 /* ---------- Dashboard (tema gelap, khusus isi halaman Dashboard -
    sidebar/topbar TETAP tema terang seperti biasa) ---------- */

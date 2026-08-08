@@ -570,20 +570,27 @@
               <input type="file" id="runUploadImageInput" accept="image/*" class="d-none">
               <p id="runUploadImageStatus" class="small text-muted mb-0"></p>
             </div>
+          </div>
+        </div>
 
-            <hr>
-            <div class="d-flex justify-content-between align-items-center mb-2">
-              <h6 class="mb-0">Adjusting Judge OK/NG</h6>
-              <button id="btnToggleJudgeAdjust" class="btn btn-sm btn-outline-secondary">Buka</button>
+        <!-- Panel "Adjusting Judge OK/NG" SEBELUMNYA ada di sidepanel kanan yang
+             sempit, sehingga slider dan bar hasil ukur jadi kecil dan gampang
+             ketiban elemen lain (kepotong/overlap secara visual). Sekarang
+             dipindah jadi kartu lebar sendiri di BAWAH gambar preview, mengikuti
+             gaya layar hasil ukur Keyence VS Series - slider & bar OK/NG jadi
+             besar dan jelas terbaca, cocok untuk ditunjukkan ke tim. -->
+        <div class="glass-card p-3 mt-3 run-judge-panel-wrap">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <h5 class="mb-0">Adjusting Judge OK/NG</h5>
+            <button id="btnToggleJudgeAdjust" class="btn btn-sm btn-outline-secondary">Tutup</button>
+          </div>
+          <div id="judgeAdjustPanel">
+            <div id="judgeAdjustList"></div>
+            <div class="d-flex gap-2 mt-2">
+              <button id="btnApplyJudgeAdjust" class="btn btn-sm btn-primary flex-fill">Terapkan (Live)</button>
+              <button id="btnSaveJudgeAdjust" class="btn btn-sm btn-success flex-fill">Simpan ke Recipe</button>
             </div>
-            <div id="judgeAdjustPanel" class="d-none">
-              <div id="judgeAdjustList" class="small"></div>
-              <div class="d-flex gap-2 mt-2">
-                <button id="btnApplyJudgeAdjust" class="btn btn-sm btn-primary flex-fill">Terapkan (Live)</button>
-                <button id="btnSaveJudgeAdjust" class="btn btn-sm btn-success flex-fill">Simpan ke Recipe</button>
-              </div>
-              <p class="small text-muted mt-2 mb-0">"Terapkan" langsung berlaku untuk siklus inspeksi berikutnya (belum permanen). Klik "Simpan ke Recipe" supaya perubahan ini tetap dipakai lain kali recipe ini diaktifkan lagi.</p>
-            </div>
+            <p class="small text-muted mt-2 mb-0">"Terapkan" langsung berlaku untuk siklus inspeksi berikutnya (belum permanen). Klik "Simpan ke Recipe" supaya perubahan ini tetap dipakai lain kali recipe ini diaktifkan lagi.</p>
           </div>
         </div>
       </section>
