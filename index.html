@@ -21,9 +21,10 @@
 <div id="loginScreen" class="login-screen d-flex align-items-center justify-content-center">
   <div class="login-card glass-card">
     <div class="text-center mb-4">
-      <div class="login-logo-box">
-        <img src="img/logo-mapin-vision.png" alt="MAP-IN Vision - Musashi Indonesia" class="login-logo-img">
-      </div>
+      <img src="https://www.gstatic.com/images/branding/product/2x/apps_script_48dp.png" class="logo-placeholder" alt="MAP-IN Vision">
+      <h2 class="brand-title">MAP-IN <span class="text-accent">VISION</span></h2>
+      <p class="brand-tagline">Intelligent Eyes for Manufacturing</p>
+      <p class="text-muted small">Musashi Indonesia</p>
     </div>
     <form id="loginForm">
       <div class="mb-3">
@@ -42,14 +43,13 @@
 
 <div id="appShell" class="app-shell d-none">
 
-  <!-- Backdrop untuk sidebar mobile (klik di luar sidebar = tutup menu) -->
-  <div id="sidebarBackdrop" class="sidebar-backdrop"></div>
-
   <!-- SIDEBAR -->
-  <nav class="sidebar" id="sidebarNav">
+  <nav class="sidebar">
     <div class="sidebar-brand">
-      <div class="sidebar-logo-box">
-        <img src="img/logo-mapin-vision.png" alt="MAP-IN Vision - Musashi Indonesia" class="sidebar-logo-img">
+      <span class="material-icons brand-icon">visibility</span>
+      <div>
+        <div class="brand-name">MAP-IN VISION</div>
+        <div class="brand-sub">Musashi Indonesia</div>
       </div>
     </div>
     <ul class="nav-menu">
@@ -73,7 +73,6 @@
   <!-- MAIN CONTENT -->
   <div class="main-content">
     <header class="topbar">
-      <button id="navToggleBtn" class="nav-toggle-btn" aria-label="Buka menu"><span class="material-icons">menu</span></button>
       <div class="topbar-title" id="viewTitle">Dashboard</div>
       <div class="topbar-user">
         <span class="badge-role" id="userRoleBadge">Operator</span>
@@ -389,14 +388,12 @@
               <div class="d-flex gap-2 align-items-center mb-2 flex-wrap">
                 <button id="btnRoiCaptureCamera" class="btn btn-sm btn-primary"><span class="material-icons align-middle" style="font-size:16px;">photo_camera</span> Ambil Gambar dari Kamera</button>
                 <button id="btnRoiOpenTestImage" class="btn btn-sm btn-outline-primary"><span class="material-icons align-middle" style="font-size:16px;">folder_open</span> Buka dari Test Images</button>
-                <button id="btnRoiUploadDevice" class="btn btn-sm btn-outline-primary"><span class="material-icons align-middle" style="font-size:16px;">upload_file</span> Upload dari Device</button>
-                <input type="file" id="roiUploadDeviceInput" accept="image/*" class="d-none">
                 <span id="roiCaptureStatus" class="small text-muted"></span>
               </div>
               <div id="roiEmptyState" class="text-center text-muted py-5">
                 <span class="material-icons" style="font-size:48px; opacity:.4;">image</span>
                 <p class="mb-0 mt-2">Belum ada gambar referensi untuk digambar ROI-nya.</p>
-                <p class="small mb-0">Klik "Ambil Gambar dari Kamera", "Buka dari Test Images", atau "Upload dari Device" (foto dari laptop/HP Anda) di atas untuk mulai.</p>
+                <p class="small mb-0">Klik "Ambil Gambar dari Kamera" di atas, atau buka Camera Center/Run Mode dulu supaya ada frame kamera yang bisa dipakai di sini.</p>
               </div>
               <video id="roiCaptureVideo" class="d-none" autoplay playsinline muted></video>
               <canvas id="roiCanvas" class="d-none"></canvas>
@@ -522,13 +519,11 @@
       <section id="view-run" class="view d-none">
         <div class="run-mode-wrapper">
           <div class="run-preview glass-card">
-            <video id="runVideo" autoplay playsinline muted class="d-none"></video>
-            <img id="runTestImagePreview" class="d-none" style="width:100%; border-radius:var(--radius-md); background:#000; display:block;">
+            <video id="runVideo" autoplay playsinline muted></video>
             <canvas id="runOverlay"></canvas>
             <div id="runDecisionBadge" class="run-decision-badge">READY</div>
-            <div id="runCameraOffOverlay" style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,.75); color:#fff; border-radius:var(--radius-md); text-align:center; flex-direction:column; gap:.5rem;">
-              <span class="material-icons" style="font-size:36px;">videocam_off</span>
-              <span>Kamera belum menyala.<br>Klik "Nyalakan Kamera (Live)" di panel kanan, atau upload gambar test untuk mulai mengukur.</span>
+            <div id="runCameraOffOverlay" class="d-none" style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,.75); color:#fff; border-radius:var(--radius-md);">
+              <span class="material-icons align-middle me-2">videocam_off</span> Kamera dimatikan
             </div>
           </div>
           <div class="run-sidepanel glass-card">
@@ -556,7 +551,7 @@
               <option value="1280x720" selected>1280 x 720</option>
               <option value="1920x1080">1920 x 1080</option>
             </select>
-            <button id="btnRunStopCamera" class="btn btn-sm btn-outline-success w-100 mb-3">Nyalakan Kamera (Live)</button>
+            <button id="btnRunStopCamera" class="btn btn-sm btn-outline-danger w-100 mb-3">Matikan Kamera</button>
 
             <div class="run-counter"><span>OK</span><strong id="runOkCount">0</strong></div>
             <div class="run-counter"><span>NG</span><strong id="runNgCount">0</strong></div>
@@ -565,32 +560,22 @@
             <div id="runNgDetail" class="small text-danger"></div>
             <div class="d-grid gap-2 mt-2 mb-3">
               <button id="btnPause" class="btn btn-outline-secondary btn-sm">Pause Trigger</button>
-              <button id="btnRecapture" class="btn btn-primary btn-sm">Measure (Trigger 1x)</button>
-              <button id="btnRunUploadImage" class="btn btn-outline-info btn-sm"><span class="material-icons align-middle" style="font-size:16px;">upload_file</span> Upload Gambar Test</button>
-              <input type="file" id="runUploadImageInput" accept="image/*" class="d-none">
-              <p id="runUploadImageStatus" class="small text-muted mb-0"></p>
+              <button id="btnRecapture" class="btn btn-outline-primary btn-sm">Re-capture Manual</button>
             </div>
-          </div>
-        </div>
 
-        <!-- Panel "Adjusting Judge OK/NG" SEBELUMNYA ada di sidepanel kanan yang
-             sempit, sehingga slider dan bar hasil ukur jadi kecil dan gampang
-             ketiban elemen lain (kepotong/overlap secara visual). Sekarang
-             dipindah jadi kartu lebar sendiri di BAWAH gambar preview, mengikuti
-             gaya layar hasil ukur Keyence VS Series - slider & bar OK/NG jadi
-             besar dan jelas terbaca, cocok untuk ditunjukkan ke tim. -->
-        <div class="glass-card p-3 mt-3 run-judge-panel-wrap">
-          <div class="d-flex justify-content-between align-items-center mb-2">
-            <h5 class="mb-0">Adjusting Judge OK/NG</h5>
-            <button id="btnToggleJudgeAdjust" class="btn btn-sm btn-outline-secondary">Tutup</button>
-          </div>
-          <div id="judgeAdjustPanel">
-            <div id="judgeAdjustList"></div>
-            <div class="d-flex gap-2 mt-2">
-              <button id="btnApplyJudgeAdjust" class="btn btn-sm btn-primary flex-fill">Terapkan (Live)</button>
-              <button id="btnSaveJudgeAdjust" class="btn btn-sm btn-success flex-fill">Simpan ke Recipe</button>
+            <hr>
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <h6 class="mb-0">Adjusting Judge OK/NG</h6>
+              <button id="btnToggleJudgeAdjust" class="btn btn-sm btn-outline-secondary">Buka</button>
             </div>
-            <p class="small text-muted mt-2 mb-0">"Terapkan" langsung berlaku untuk siklus inspeksi berikutnya (belum permanen). Klik "Simpan ke Recipe" supaya perubahan ini tetap dipakai lain kali recipe ini diaktifkan lagi.</p>
+            <div id="judgeAdjustPanel" class="d-none">
+              <div id="judgeAdjustList" class="small"></div>
+              <div class="d-flex gap-2 mt-2">
+                <button id="btnApplyJudgeAdjust" class="btn btn-sm btn-primary flex-fill">Terapkan (Live)</button>
+                <button id="btnSaveJudgeAdjust" class="btn btn-sm btn-success flex-fill">Simpan ke Recipe</button>
+              </div>
+              <p class="small text-muted mt-2 mb-0">"Terapkan" langsung berlaku untuk siklus inspeksi berikutnya (belum permanen). Klik "Simpan ke Recipe" supaya perubahan ini tetap dipakai lain kali recipe ini diaktifkan lagi.</p>
+            </div>
           </div>
         </div>
       </section>

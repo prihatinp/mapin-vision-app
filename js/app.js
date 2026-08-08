@@ -84,38 +84,8 @@ function bindNav() {
       li.classList.add('active');
       const view = li.getAttribute('data-view');
       showView(view);
-      closeMobileSidebar(); // di layar HP, sidebar otomatis tertutup setelah pilih menu
     });
   });
-
-  bindMobileSidebarToggle();
-}
-
-/**
- * Sidebar di layar sempit (HP) disembunyikan off-canvas via CSS
- * (lihat @media max-width:900px di style.css) dan dibuka/ditutup lewat
- * tombol hamburger di topbar + backdrop gelap di belakangnya. Di layar
- * besar (laptop/tablet lanskap) CSS ini tidak aktif jadi tombol toggle
- * ini tidak berpengaruh (sidebar selalu tampil seperti biasa).
- */
-function bindMobileSidebarToggle() {
-  const toggleBtn = document.getElementById('navToggleBtn');
-  const sidebar = document.getElementById('sidebarNav');
-  const backdrop = document.getElementById('sidebarBackdrop');
-  if (!toggleBtn || !sidebar || !backdrop) return;
-
-  toggleBtn.addEventListener('click', function () {
-    sidebar.classList.toggle('open');
-    backdrop.classList.toggle('show');
-  });
-  backdrop.addEventListener('click', closeMobileSidebar);
-}
-
-function closeMobileSidebar() {
-  const sidebar = document.getElementById('sidebarNav');
-  const backdrop = document.getElementById('sidebarBackdrop');
-  if (sidebar) sidebar.classList.remove('open');
-  if (backdrop) backdrop.classList.remove('show');
 }
 
 let _currentViewName = null;
@@ -167,7 +137,7 @@ function loadDashboard() {
     document.getElementById('statOk').innerText = res.okCount;
     document.getElementById('statNg').innerText = res.ngCount;
     document.getElementById('statYield').innerText = res.yieldPct + '%';
-    document.getElementById('statCycleTime').innerText = res.avgCycleTimeMs ? (res.avgCycleTimeMs / 1000).toFixed(2) + 's' : '-';
+    document.getElementById('statCycleTime').innerText = res.avgCycleTimeMs ? (res.avgCycleTimeMs / 1000).toFixed(1) + 's' : '-';
     document.getElementById('statUph').innerText = res.avgCycleTimeMs ? Math.round(3600000 / res.avgCycleTimeMs) : '-';
 
     // Delta dibandingkan dengan hari sebelumnya, dihitung dari 2 entri terakhir
@@ -321,7 +291,7 @@ function _renderDashLastResult(last) {
   badge.style.color = last.decision === 'OK' ? '#37e28c' : '#ff6b6b';
   document.getElementById('lastResultRecipe').innerText = last.recipeName || '-';
   document.getElementById('lastResultTime').innerText = last.timestamp ? new Date(last.timestamp).toLocaleString('id-ID') : '-';
-  document.getElementById('lastResultCycle').innerText = last.cycleTimeMs ? (last.cycleTimeMs / 1000).toFixed(2) + 's' : '-';
+  document.getElementById('lastResultCycle').innerText = last.cycleTimeMs ? (last.cycleTimeMs / 1000).toFixed(1) + 's' : '-';
   document.getElementById('lastResultNgReason').innerText = last.ngReasonType || '-';
   const imgLink = document.getElementById('lastResultImgLink');
   if (last.imagePath) {
@@ -332,27 +302,48 @@ function _renderDashLastResult(last) {
   }
 
   // Foto berganti mengikuti hasil cycle inspeksi terbaru (bukan live stream
-  // kamera - ini snapshot hasil inspeksi yang benar-benar tersimpan di
-  // Drive), otomatis ter-refresh tiap kali loadDashboard() dipanggil ulang
-  // lewat polling di bawah.
+  // kamera), otomatis ter-refresh tiap kali loadDashboard() dipanggil ulang
+  // lewat polling di bawah. Ada 2 sumber foto:
+  //  1. imageFileId terisi -> foto tersimpan PERMANEN di Drive (mis. NG,
+  //     atau recipe dengan policy OK_AND_NG) -> apiGetDriveImageBase64.
+  //  2. imageFileId kosong TAPI decision OK & recordId ada -> foto TIDAK
+  //     disimpan ke Drive (hemat storage - policy default NG_ONLY), tapi
+  //     masih ada di cache sementara Apps Script (berlaku ~6 jam) ->
+  //     apiGetTempInspectionImage. Kalau sudah kadaluarsa, tampilkan pesan
+  //     placeholder alih-alih foto kosong membingungkan.
   const img = document.getElementById('lastResultImg');
   const loading = document.getElementById('lastResultImgLoading');
-  if (!last.imageFileId) {
+  const dashKey = last.imageFileId ? ('drive:' + last.imageFileId) : (last.recordId ? ('temp:' + last.recordId) : null);
+
+  if (!dashKey) {
     img.classList.add('d-none');
     loading.classList.add('d-none');
     _lastDashImageFileId = null;
     return;
   }
-  if (last.imageFileId === _lastDashImageFileId) return; // gambar sama, tidak perlu fetch ulang
+  if (dashKey === _lastDashImageFileId) return; // gambar sama, tidak perlu fetch ulang
 
-  _lastDashImageFileId = last.imageFileId;
+  _lastDashImageFileId = dashKey;
   img.classList.add('d-none');
   loading.classList.remove('d-none');
-  callApi('apiGetDriveImageBase64', [last.imageFileId, CURRENT_SESSION]).then(function (res) {
-    loading.classList.add('d-none');
+  loading.innerText = 'Memuat foto...';
+
+  const fetchCall = last.imageFileId
+    ? callApi('apiGetDriveImageBase64', [last.imageFileId, CURRENT_SESSION])
+    : callApi('apiGetTempInspectionImage', [last.recordId, CURRENT_SESSION]);
+
+  fetchCall.then(function (res) {
     if (res.success) {
+      loading.classList.add('d-none');
       img.src = res.dataUri;
       img.classList.remove('d-none');
+    } else if (!last.imageFileId) {
+      // Foto sementara (bukan Drive) sudah kadaluarsa/tidak ter-cache -
+      // ini normal untuk hasil OK lama, bukan error, jadi pesannya netral.
+      loading.classList.remove('d-none');
+      loading.innerText = 'Foto tidak disimpan permanen untuk hasil OK ini (hemat storage), dan cache sementaranya sudah kadaluarsa.';
+    } else {
+      loading.classList.add('d-none');
     }
   }).catch(function () { loading.classList.add('d-none'); });
 }
@@ -470,7 +461,7 @@ function loadHistory() {
         '<td>' + (r.operator || '-') + '</td>' +
         '<td><span class="badge ' + (r.decision === 'OK' ? 'bg-success' : 'bg-danger') + '">' + r.decision + '</span></td>' +
         '<td class="small text-danger">' + (r.ngReason || '') + '</td>' +
-        '<td>' + r.cycleTimeMs + '</td>' +
+        '<td>' + (r.cycleTimeMs ? (r.cycleTimeMs / 1000).toFixed(1) + ' s' : '-') + '</td>' +
         '<td>' + (r.imagePath ? '<a href="' + r.imagePath + '" target="_blank">Lihat</a>' : '-') + '</td>';
       tbody.appendChild(tr);
     });

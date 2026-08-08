@@ -444,102 +444,11 @@ let runStream = null;
 let pollIntervalId = null; // trigger EXTERNAL (polling status IO)
 let internalTriggerIntervalId = null; // trigger INTERNAL (timer capture otomatis)
 
-/**
- * Gambar uji-coba yang diupload lewat tombol "Upload Gambar Test" -
- * kalau terisi (bukan null), setiap kali tombol "Measure (Trigger 1x)"
- * diklik, sistem MENGUKUR GAMBAR INI (bukan kamera live). Gambar ini
- * SENGAJA TETAP TERSIMPAN (tidak dikosongkan otomatis setelah 1x
- * pakai) supaya operator/engineer bisa klik Measure berkali-kali
- * dengan gambar yang SAMA sambil menggeser slider "Adjusting Judge
- * OK/NG" - untuk melihat efek perubahan parameter terhadap hasil
- * OK/NG tanpa perlu upload ulang tiap kali. Baru dikosongkan saat
- * user upload gambar lain, atau klik "Nyalakan Kamera (Live)" untuk
- * kembali ke mode kamera.
- */
-let runStaticTestImage = null;
-
-function initRunUploadImageControls() {
-  const btn = document.getElementById('btnRunUploadImage');
-  const input = document.getElementById('runUploadImageInput');
-  const statusEl = document.getElementById('runUploadImageStatus');
-  if (!btn || !input) return;
-
-  btn.onclick = function () { input.click(); };
-  input.onchange = function (e) {
-    const file = e.target.files && e.target.files[0];
-    input.value = ''; // supaya file yang sama bisa dipilih ulang
-    if (!file) return;
-    if (!file.type || file.type.indexOf('image/') !== 0) {
-      if (statusEl) statusEl.innerText = 'File yang dipilih bukan gambar.';
-      return;
-    }
-    if (!ACTIVE_RECIPE) {
-      alert('Belum ada recipe aktif. Aktifkan recipe dulu di Recipe Management sebelum uji coba.');
-      return;
-    }
-    if (statusEl) statusEl.innerText = 'Memuat gambar...';
-
-    const reader = new FileReader();
-    reader.onload = function (ev) {
-      const img = new Image();
-      img.onload = function () {
-        // Matikan kamera live (kalau sedang menyala) - kita pindah ke mode
-        // gambar statis, supaya trigger otomatis tidak diam-diam kembali
-        // memotret dari kamera dan menimpa gambar yang mau diuji.
-        if (runStream) {
-          runStream.getTracks().forEach(function (t) { t.stop(); });
-          runStream = null;
-          document.getElementById('runVideo').srcObject = null;
-        }
-        runPollingActive = false; // pause trigger otomatis - Measure sekarang dikontrol manual
-        const btnPause = document.getElementById('btnPause');
-        if (btnPause) btnPause.innerText = 'Resume Trigger';
-
-        const tmp = document.createElement('canvas');
-        tmp.width = img.naturalWidth;
-        tmp.height = img.naturalHeight;
-        tmp.getContext('2d').drawImage(img, 0, 0);
-        runStaticTestImage = tmp;
-
-        // Tampilkan gambar yang diupload di preview (ganti video), SEBELUM
-        // diukur - sesuai permintaan: gambar tampil dulu, baru diukur saat
-        // tombol Measure diklik, bukan langsung otomatis terukur.
-        const previewImg = document.getElementById('runTestImagePreview');
-        previewImg.src = ev.target.result;
-        previewImg.classList.remove('d-none');
-        document.getElementById('runVideo').classList.add('d-none');
-        document.getElementById('runCameraOffOverlay').classList.add('d-none');
-        const overlayEl = document.getElementById('runOverlay');
-        overlayEl.width = img.naturalWidth;
-        overlayEl.height = img.naturalHeight;
-        overlayEl.getContext('2d').clearRect(0, 0, overlayEl.width, overlayEl.height);
-        document.getElementById('runDecisionBadge').innerText = 'READY';
-        document.getElementById('runDecisionBadge').className = 'run-decision-badge';
-
-        if (statusEl) statusEl.innerText = 'Gambar "' + file.name + '" siap. Klik "Measure (Trigger 1x)" di bawah untuk mengukur.';
-      };
-      img.onerror = function () {
-        if (statusEl) statusEl.innerText = 'Gagal membaca file gambar tersebut.';
-      };
-      img.src = ev.target.result;
-    };
-    reader.onerror = function () {
-      if (statusEl) statusEl.innerText = 'Gagal membaca file dari device.';
-    };
-    reader.readAsDataURL(file);
-  };
-}
-
 function initRunMode() {
-  // SEBELUMNYA kamera langsung menyala otomatis begitu Run Mode dibuka.
-  // Sekarang kamera SENGAJA menunggu perintah eksplisit (tombol "Nyalakan
-  // Kamera (Live)") - supaya operator bisa memilih dulu mau uji coba pakai
-  // gambar upload, atau langsung live, tanpa lampu indikator kamera
-  // menyala duluan padahal belum tentu dipakai.
-  runStaticTestImage = null;
+  startRunCamera();
 
   const resSelect = document.getElementById('runResolutionSelect');
-  if (resSelect) resSelect.onchange = function () { if (runStream) startRunCamera(); }; // ganti resolusi -> nyalakan ulang stream HANYA kalau kamera memang sedang live
+  if (resSelect) resSelect.onchange = startRunCamera; // ganti resolusi -> nyalakan ulang stream dgn ukuran baru
 
   const btnRunStopCamera = document.getElementById('btnRunStopCamera');
   if (btnRunStopCamera) btnRunStopCamera.onclick = toggleRunCamera;
@@ -583,9 +492,8 @@ function initRunMode() {
     runPollingActive = !runPollingActive;
     this.innerText = runPollingActive ? 'Pause Trigger' : 'Resume Trigger';
   };
-  document.getElementById('btnRecapture').onclick = function () { runInspectionCycle(true); };
+  document.getElementById('btnRecapture').onclick = runInspectionCycle;
 
-  initRunUploadImageControls();
   initTriggerModeControls();
   initJudgeAdjustPanel();
 
@@ -615,25 +523,9 @@ function startRunCamera() {
     runVideoEl.muted = true; // wajib agar autoplay tidak diblokir browser
     runVideoEl.srcObject = stream;
     runVideoEl.play().catch(function (playErr) { console.warn('video.play() gagal:', playErr); });
-
-    // Kembali ke mode kamera live - keluar dari mode "gambar statis" kalau
-    // sebelumnya sedang menguji gambar upload.
-    runStaticTestImage = null;
-    document.getElementById('runTestImagePreview').classList.add('d-none');
-    runVideoEl.classList.remove('d-none');
     document.getElementById('runCameraOffOverlay').classList.add('d-none');
-    const uploadStatusEl = document.getElementById('runUploadImageStatus');
-    if (uploadStatusEl) uploadStatusEl.innerText = '';
-
     const btn = document.getElementById('btnRunStopCamera');
-    if (btn) { btn.innerText = 'Matikan Kamera'; btn.classList.remove('btn-outline-success'); btn.classList.add('btn-outline-danger'); }
-
-    // Nyalakan live -> otomatis lanjutkan trigger (kalau sebelumnya di-pause
-    // karena mode gambar statis atau kamera mati).
-    runPollingActive = true;
-    const btnPause = document.getElementById('btnPause');
-    if (btnPause) btnPause.innerText = 'Pause Trigger';
-    startSelectedTriggerLoop();
+    if (btn) { btn.innerText = 'Matikan Kamera'; btn.classList.replace('btn-outline-success', 'btn-outline-danger'); }
   }).catch(function (err) {
     alert('Gagal mengakses kamera untuk Run Mode: ' + err.message);
   });
@@ -730,7 +622,6 @@ function stopRunMode() {
   }
   const runVideoEl = document.getElementById('runVideo');
   if (runVideoEl) runVideoEl.srcObject = null;
-  runStaticTestImage = null; // keluar dari menu Run Mode -> reset mode gambar statis juga
 }
 
 /* ==================================================================
@@ -775,42 +666,21 @@ function initJudgeAdjustPanel() {
   }
 }
 
-/**
- * Daftar field parameter utama yang bisa di-adjust per tipe tool, LENGKAP
- * dengan min/max - dipakai untuk batas slider ala Keyence VS Series DAN
- * sebagai skala bar hasil pengukuran (lihat updateJudgeValueBars()).
- */
+/** Daftar field parameter utama yang bisa di-adjust per tipe tool (input id -> params key). */
 function _judgeAdjustFieldsForType(type) {
   switch (type) {
-    case 'PatternMatch': return [{ key: 'threshold', label: 'Threshold Similarity (0-1)', step: 0.01, min: 0, max: 1 }];
-    case 'Blob': return [{ key: 'minAreaMm2', label: 'Min Area Defect (mm²)', step: 0.01, min: 0, max: 100 }];
-    case 'EdgeDimension': return [
-      { key: 'toleranceMm', label: 'Toleransi (mm)', step: 0.01, min: 0, max: 20 },
-      { key: 'nominalMm', label: 'Nominal (mm)', step: 0.01, min: 0, max: 500 }
-    ];
-    case 'Presence': return [{ key: 'pixelThresholdPct', label: 'Threshold Piksel (%)', step: 0.1, min: 0, max: 100 }];
-    case 'Color': return [
-      { key: 'threshold', label: 'Toleransi (+/-)', step: 1, min: 0, max: 100 },
-      { key: 'targetMean', label: 'Target Mean (0-255)', step: 1, min: 0, max: 255 }
-    ];
-    case 'Counting': return [
-      { key: 'expectedMin', label: 'Jumlah Minimum', step: 1, min: 0, max: 50 },
-      { key: 'expectedMax', label: 'Jumlah Maksimum', step: 1, min: 0, max: 50 }
-    ];
-    case 'AIClassification': return [{ key: 'confidenceThreshold', label: 'Confidence Threshold (0-1)', step: 0.01, min: 0, max: 1 }];
-    case 'AIDetection': return [{ key: 'confidenceThreshold', label: 'Confidence Threshold (0-1)', step: 0.01, min: 0, max: 1 }];
+    case 'PatternMatch': return [{ key: 'threshold', label: 'Threshold Similarity (0-1)', step: 0.01 }];
+    case 'Blob': return [{ key: 'minAreaMm2', label: 'Min Area Defect (mm²)', step: 0.01 }];
+    case 'EdgeDimension': return [{ key: 'toleranceMm', label: 'Toleransi (mm)', step: 0.01 }, { key: 'nominalMm', label: 'Nominal (mm)', step: 0.01 }];
+    case 'Presence': return [{ key: 'pixelThresholdPct', label: 'Threshold Piksel (%)', step: 0.1 }];
+    case 'Color': return [{ key: 'threshold', label: 'Toleransi (+/-)', step: 1 }, { key: 'targetMean', label: 'Target Mean (0-255)', step: 1 }];
+    case 'Counting': return [{ key: 'expectedMin', label: 'Jumlah Minimum', step: 1 }, { key: 'expectedMax', label: 'Jumlah Maksimum', step: 1 }];
+    case 'AIClassification': return [{ key: 'confidenceThreshold', label: 'Confidence Threshold (0-1)', step: 0.01 }];
+    case 'AIDetection': return [{ key: 'confidenceThreshold', label: 'Confidence Threshold (0-1)', step: 0.01 }];
     default: return []; // QR/Barcode/OCR: berbasis rule teks, bukan angka - tidak ada quick-adjust di sini
   }
 }
 
-/**
- * Render panel Adjusting Judge OK/NG - tiap parameter tool ditampilkan
- * sebagai slider (bisa digeser-geser, ala Keyence VS Series) + input
- * angka (sinkron 2 arah dengan slider), PLUS 1 bar "Hasil Ukur" yang
- * nanti diisi live oleh updateJudgeValueBars() setiap selesai 1 siklus
- * inspeksi - bar-nya berubah HIJAU (OK) / MERAH (NG) mengikuti hasil
- * perbandingan ke parameter standar saat itu.
- */
 function renderJudgeAdjustList() {
   const listEl = document.getElementById('judgeAdjustList');
   if (!listEl || !ACTIVE_RECIPE) return;
@@ -825,60 +695,20 @@ function renderJudgeAdjustList() {
     const roi = (ACTIVE_RECIPE.rois || []).find(function (r) { return r.id === tool.roiId; });
 
     const wrap = document.createElement('div');
-    wrap.className = 'mb-3 pb-2 border-bottom';
-    let html = '<div class="fw-bold mb-1">' + toolTypeLabel(tool.type) + (roi ? ' &middot; ' + roi.name : '') + '</div>';
-    fields.forEach(function (f, fIdx) {
-      const val = tool.params && tool.params[f.key] != null ? tool.params[f.key] : f.min;
-      const commonAttrs = 'data-tool-id="' + tool.id + '" data-param-key="' + f.key + '" data-field-min="' + f.min + '" data-field-max="' + f.max + '"';
-      html +=
-        '<label class="form-label small mb-0 mt-1">' + f.label + '</label>' +
-        '<div class="d-flex align-items-center gap-2">' +
-          '<input type="range" min="' + f.min + '" max="' + f.max + '" step="' + f.step + '" value="' + val + '" ' +
-            'class="form-range judge-adjust-slider" ' + commonAttrs + ' style="flex:1;">' +
-          '<input type="number" step="' + f.step + '" class="form-control form-control-sm judge-adjust-input" ' +
-            commonAttrs + ' value="' + val + '" style="width:5.5rem;">' +
-        '</div>' +
-        '<div class="judge-value-bar-track" id="judgeBar_' + tool.id + '_' + f.key + '">' +
-          '<div class="judge-value-bar-fill" style="width:0%;"></div>' +
-          '<span class="judge-value-bar-label">Belum diukur</span>' +
-        '</div>';
+    wrap.className = 'mb-2 pb-2 border-bottom';
+    let html = '<div class="fw-bold">' + toolTypeLabel(tool.type) + (roi ? ' &middot; ' + roi.name : '') + '</div>';
+    fields.forEach(function (f) {
+      const val = tool.params && tool.params[f.key] != null ? tool.params[f.key] : '';
+      html += '<label class="form-label small mb-0 mt-1">' + f.label + '</label>' +
+        '<input type="number" step="' + f.step + '" class="form-control form-control-sm judge-adjust-input" ' +
+        'data-tool-id="' + tool.id + '" data-param-key="' + f.key + '" value="' + val + '">';
     });
     wrap.innerHTML = html;
     listEl.appendChild(wrap);
   });
-
-  attachJudgeInputSync();
 }
 
 /** toolTypeLabel() sudah ada di roiEditor.js (dimuat sebelum visionTools.js) - dipakai ulang di sini. */
-
-/**
- * Sinkronkan slider <-> input angka 2 arah (geser slider = angka ikut
- * berubah, dan sebaliknya), lalu langsung terapkan ke ACTIVE_RECIPE
- * in-memory setiap kali digeser - supaya siklus/Measure BERIKUTNYA
- * langsung memakai nilai baru tanpa perlu klik "Terapkan" dulu (mirip
- * kebiasaan geser slider VS Series yang efeknya langsung terasa).
- * Tombol "Terapkan (Live)" & "Simpan ke Recipe" tetap ada untuk
- * memastikan/mem-persist, tapi geser slider sendiri sudah otomatis live.
- */
-function attachJudgeInputSync() {
-  document.querySelectorAll('.judge-adjust-slider, .judge-adjust-input').forEach(function (el) {
-    el.oninput = function () {
-      const toolId = el.getAttribute('data-tool-id');
-      const key = el.getAttribute('data-param-key');
-      const val = el.value;
-      // Sinkronkan pasangannya (slider <-> number) yang punya tool-id + key sama
-      document.querySelectorAll('[data-tool-id="' + toolId + '"][data-param-key="' + key + '"]').forEach(function (pair) {
-        if (pair !== el) pair.value = val;
-      });
-      const tool = (ACTIVE_RECIPE.tools || []).find(function (t) { return t.id === toolId; });
-      if (tool) {
-        tool.params = tool.params || {};
-        tool.params[key] = parseFloat(val);
-      }
-    };
-  });
-}
 
 function applyJudgeAdjustments() {
   if (!ACTIVE_RECIPE) return;
@@ -898,54 +728,7 @@ function applyJudgeAdjustments() {
   }
 }
 
-/**
- * Diisi live setiap selesai 1 siklus inspeksi (dipanggil dari
- * updateRunModeUi) - mengisi bar "Hasil Ukur" tiap tool dengan posisi
- * nilai terukur pada skala min-max field-nya, dan warna hijau (OK) /
- * merah (NG) sesuai passFail dari server (VisionToolsEngine - source
- * of truth). Kalau tool punya >1 field (mis. EdgeDimension), field
- * pertama dipakai sebagai representasi bar utama.
- */
-function updateJudgeValueBars(toolResults) {
-  if (!toolResults) return;
-  toolResults.forEach(function (tr) {
-    const bars = document.querySelectorAll('[id^="judgeBar_' + tr.toolId + '_"]');
-    if (!bars.length) return;
-    bars.forEach(function (barTrack) {
-      const key = barTrack.id.split('_').slice(2).join('_');
-      const sliderEl = document.querySelector('.judge-adjust-slider[data-tool-id="' + tr.toolId + '"][data-param-key="' + key + '"]');
-      const min = sliderEl ? parseFloat(sliderEl.min) : 0;
-      const max = sliderEl ? parseFloat(sliderEl.max) : 1;
-      const numericValue = typeof tr.value === 'number' ? tr.value : parseFloat(tr.value);
-
-      const fill = barTrack.querySelector('.judge-value-bar-fill');
-      const label = barTrack.querySelector('.judge-value-bar-label');
-      if (!isNaN(numericValue) && max > min) {
-        const pct = Math.max(0, Math.min(100, ((numericValue - min) / (max - min)) * 100));
-        fill.style.width = pct + '%';
-      } else {
-        fill.style.width = '100%'; // nilai non-numerik (mis. hasil AI Classification berupa nama kelas) - bar penuh, warna tetap jadi indikator OK/NG
-      }
-      fill.className = 'judge-value-bar-fill ' + (tr.passFail ? 'ok' : 'ng');
-      label.innerText = (typeof tr.value === 'number' ? tr.value.toFixed(2) : tr.value) + ' — ' + (tr.passFail ? 'OK' : 'NG');
-    });
-  });
-}
-
-/**
- * @param {boolean} [isManualTrigger] - true HANYA kalau dipanggil langsung
- *   dari klik tombol "Measure (Trigger 1x)" (aksi user, sekali jalan).
- *   PENTING: nilai ini WAJIB false/kosong untuk semua pemanggilan dari
- *   loop otomatis (startInternalTriggerLoop/startExternalTriggerLoop),
- *   karena fungsi ini dipanggil BERULANG lewat setInterval - kalau guard
- *   di bawah pakai alert() tanpa syarat ini, begitu kamera mati/belum ada
- *   gambar test, alert() akan muncul TERUS-MENERUS setiap tick interval
- *   (blocking dialog di browser), sampai tab harus dipaksa ditutup. Ini
- *   BUG NYATA yang pernah terjadi - makanya sekarang loop otomatis hanya
- *   mencatat ke console (senyap), sedangkan klik manual tetap dapat
- *   feedback jelas tapi lewat teks status (non-blocking), BUKAN alert().
- */
-async function runInspectionCycle(isManualTrigger) {
+async function runInspectionCycle() {
   if (!ACTIVE_RECIPE) return;
 
   // Pastikan opencv.js sudah selesai dimuat sebelum dipakai (lihat catatan di
@@ -957,31 +740,11 @@ async function runInspectionCycle(isManualTrigger) {
 
   const startMs = performance.now();
 
-  // Sumber frame: kalau ada runStaticTestImage terisi (lewat tombol
-  // "Upload Gambar Test"), pakai gambar itu terus-menerus setiap Measure
-  // diklik (TIDAK dikosongkan otomatis) - supaya bisa diukur berkali-kali
-  // sambil menggeser slider "Adjusting Judge OK/NG" tanpa upload ulang.
-  // Kalau tidak ada gambar statis, pakai frame kamera live seperti biasa.
-  let fullCanvas;
-  if (runStaticTestImage) {
-    fullCanvas = runStaticTestImage;
-  } else {
-    const video = document.getElementById('runVideo');
-    if (!video.videoWidth) {
-      const msg = 'Kamera belum menyala dan belum ada gambar test yang diupload. Klik "Nyalakan Kamera (Live)" atau "Upload Gambar Test" dulu.';
-      if (isManualTrigger) {
-        const statusEl = document.getElementById('runUploadImageStatus');
-        if (statusEl) statusEl.innerHTML = '<span class="text-danger">' + msg + '</span>';
-      } else {
-        console.warn('Siklus trigger otomatis dilewati:', msg); // loop otomatis - JANGAN alert(), cukup senyap di console
-      }
-      return;
-    }
-    fullCanvas = document.createElement('canvas');
-    fullCanvas.width = video.videoWidth;
-    fullCanvas.height = video.videoHeight;
-    fullCanvas.getContext('2d').drawImage(video, 0, 0);
-  }
+  const video = document.getElementById('runVideo');
+  const fullCanvas = document.createElement('canvas');
+  fullCanvas.width = video.videoWidth;
+  fullCanvas.height = video.videoHeight;
+  fullCanvas.getContext('2d').drawImage(video, 0, 0);
 
   const overlay = document.getElementById('runOverlay');
   overlay.width = fullCanvas.width;
@@ -1033,15 +796,11 @@ async function runInspectionCycle(isManualTrigger) {
 
   const clientProcessingMs = performance.now() - startMs;
 
-  return callApi('apiRunInspection', [{
+  callApi('apiRunInspection', [{
     imageBase64: fullCanvas.toDataURL('image/jpeg', 0.85),
     recipeId: ACTIVE_RECIPE.id,
     toolResults: toolResults,
-    clientProcessingMs: clientProcessingMs,
-    // Kirim parameter tool TERKINI (termasuk perubahan slider "Adjusting
-    // Judge OK/NG" yang belum disimpan) supaya server menjudge pakai nilai
-    // yang sedang ditampilkan di layar, bukan nilai lama dari Spreadsheet.
-    toolsOverride: ACTIVE_RECIPE.tools
+    clientProcessingMs: clientProcessingMs
   }, CURRENT_SESSION]).then(function (res) {
     if (res.success === false) { console.warn('Inspeksi gagal:', res.error); return; }
     updateRunModeUi(res);
@@ -1067,7 +826,13 @@ function drawAiOverlay(ctx, detections, offsetX, offsetY) {
 
 function updateRunModeUi(res) {
   const badge = document.getElementById('runDecisionBadge');
-  badge.innerText = res.decision + ' (' + res.cycleTimeMs + ' ms)';
+  // Ditampilkan dalam detik (bukan ms mentah yang desimalnya panjang, mis.
+  // "815.4000000953674 ms" - itu wajar terjadi karena cycleTimeMs dihitung
+  // dari performance.now() yang presisinya sub-milidetik, tapi tidak enak
+  // dibaca operator). toFixed(1) -> 1 angka di belakang koma sudah cukup
+  // presisi untuk satuan detik di konteks inspeksi.
+  const cycleTimeSec = ((res.cycleTimeMs || 0) / 1000).toFixed(1);
+  badge.innerText = res.decision + ' (' + cycleTimeSec + ' s)';
   badge.className = 'run-decision-badge ' + (res.decision === 'OK' ? 'ok' : 'ng');
 
   if (typeof sendDecisionToArduino === 'function') sendDecisionToArduino(res.decision);
@@ -1082,6 +847,4 @@ function updateRunModeUi(res) {
   detailDiv.innerHTML = res.ngReasons.map(function (r) {
     return r.type + ': ' + r.reason;
   }).join('<br>');
-
-  updateJudgeValueBars(res.toolResults);
 }

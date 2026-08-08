@@ -46,11 +46,6 @@ body{
 .login-card{ width:380px; padding:2.5rem; }
 .logo-placeholder{ width:48px; opacity:.9; }
 .brand-title{ font-weight:800; color:#fff; letter-spacing:1px; }
-/* Logo resmi MAP-IN Vision (Musashi Indonesia) - gambarnya sendiri sudah
-   memuat nama produk + tagline, jadi dipasang di kotak putih supaya
-   terbaca jelas di atas kartu login yang bertema gelap. */
-.login-logo-box{ background:#fff; border-radius:14px; padding:1rem 1.25rem; display:inline-block; box-shadow:0 4px 16px rgba(0,0,0,.25); }
-.login-logo-img{ max-width:280px; width:100%; height:auto; display:block; }
 .text-accent{ color:#ff6b6b; }
 .brand-tagline{ color:#7fb8ff; font-size:.85rem; font-style:italic; }
 .login-card .text-muted{ color:var(--c-text-muted) !important; }
@@ -63,14 +58,10 @@ body{
   color:#fff; display:flex; flex-direction:column; padding:1.25rem 0;
   position:sticky; top:0; height:100vh;
 }
-.sidebar-brand{ padding:1.1rem 1.1rem 1.25rem; border-bottom:1px solid rgba(255,255,255,.15); }
+.sidebar-brand{ display:flex; align-items:center; gap:.6rem; padding:0 1.25rem 1.25rem; border-bottom:1px solid rgba(255,255,255,.15); }
 .brand-icon{ font-size:32px; color:var(--c-accent); }
 .brand-name{ font-weight:700; font-size:.95rem; letter-spacing:.5px; }
 .brand-sub{ font-size:.7rem; opacity:.7; }
-/* Logo resmi MAP-IN Vision di sidebar - kotak putih supaya logo (yang
-   dibuat dengan latar putih) tetap terbaca jelas di atas sidebar gelap. */
-.sidebar-logo-box{ background:#fff; border-radius:10px; padding:.55rem .7rem; }
-.sidebar-logo-img{ width:100%; height:auto; display:block; }
 
 .nav-menu{ list-style:none; padding:1rem 0; margin:0; flex:1; overflow-y:auto; }
 .nav-menu li{
@@ -87,22 +78,9 @@ body{
 .topbar{
   height:64px; background:#0f1526; display:flex; align-items:center; justify-content:space-between;
   padding:0 1.5rem; box-shadow:0 2px 8px rgba(0,0,0,.35); border-bottom:1px solid rgba(255,255,255,.07);
-  position:sticky; top:0; z-index:10; gap:.75rem;
+  position:sticky; top:0; z-index:10;
 }
-.topbar-title{ font-weight:700; color:var(--c-text); font-size:1.1rem; margin-right:auto; }
-/* Tombol hamburger - hanya tampil di layar sempit (lihat @media mobile
-   di bawah); di layar besar sidebar selalu tampil jadi tombol ini
-   disembunyikan supaya tidak makan tempat di topbar. */
-.nav-toggle-btn{
-  display:none; background:none; border:none; color:var(--c-text); font-size:0; padding:.4rem;
-  border-radius:8px; cursor:pointer; line-height:0; flex-shrink:0;
-}
-.nav-toggle-btn .material-icons{ font-size:24px; }
-.nav-toggle-btn:hover{ background:rgba(255,255,255,.08); }
-.sidebar-backdrop{
-  display:none; position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:1040;
-}
-.sidebar-backdrop.show{ display:block; }
+.topbar-title{ font-weight:700; color:var(--c-text); font-size:1.1rem; }
 .badge-role{ background:var(--c-secondary); color:#fff; padding:.25rem .6rem; border-radius:20px; font-size:.7rem; margin-right:.5rem; }
 #userFullName{ color:var(--c-text); }
 .content-area{ padding:1.5rem; flex:1; }
@@ -121,15 +99,7 @@ body{
 /* ---------- Camera / Run Mode ---------- */
 .camera-preview-card, .roi-canvas-card{ position:relative; padding:.5rem; overflow:hidden; }
 .camera-preview-card video{ width:100%; border-radius:var(--radius-md); background:#000; }
-/* BUG YANG DIPERBAIKI: canvas overlay ini di-set lebar/tinggi lewat JS
-   memakai UKURAN PIKSEL ASLI gambar/video (mis. 640x480), TAPI video/img
-   di baliknya di-scale CSS width:100% mengikuti lebar kartu (mis. ~900px)
-   - sehingga overlay terlihat sebagai "kotak ganda" lebih kecil menumpuk
-   di pojok kiri-atas gambar yang sudah membesar (persis yang terlihat di
-   screenshot "kepotong/dobel"). Fix: overlay ikut di-scale mengikuti lebar
-   video/img (dikurangi padding kartu .5rem kiri+kanan supaya presisi
-   menumpuk pas di atas video/img, bukan di atas padding kartunya). */
-#cameraOverlay, #runOverlay{ position:absolute; top:.5rem; left:.5rem; width:calc(100% - 1rem); height:auto; pointer-events:none; }
+#cameraOverlay, #runOverlay{ position:absolute; top:.5rem; left:.5rem; pointer-events:none; }
 
 /* Kanvas ROI Editor SEBELUMNYA dirender di ukuran piksel ASLI gambar
    (mis. 1920x1080) tanpa mengecil menyesuaikan lebar kartu, sehingga
@@ -167,38 +137,6 @@ body{
 .run-decision-badge.ng{ background:var(--c-accent); }
 .run-sidepanel{ flex:1; padding:1.25rem; }
 .run-counter{ display:flex; justify-content:space-between; padding:.5rem 0; border-bottom:1px dashed var(--c-card-border); }
-
-/* Bar "Hasil Ukur" ala Keyence VS Series - di bawah tiap slider parameter
-   di panel "Adjusting Judge OK/NG". Warna hijau/merah diisi live oleh
-   updateJudgeValueBars() di visionTools.js setiap selesai 1 siklus/Measure. */
-.judge-value-bar-track{
-  position:relative; height:20px; border-radius:6px; background:rgba(255,255,255,.06);
-  border:1px solid var(--c-card-border); margin:.3rem 0 .6rem; overflow:hidden;
-}
-.judge-value-bar-fill{
-  position:absolute; top:0; left:0; bottom:0; width:0%; background:#666;
-  transition:width .2s ease, background-color .2s ease;
-}
-.judge-value-bar-fill.ok{ background:var(--c-success); }
-.judge-value-bar-fill.ng{ background:#ff6b6b; }
-.judge-value-bar-label{
-  position:relative; z-index:1; font-size:.7rem; font-weight:700; color:var(--c-text);
-  display:flex; align-items:center; justify-content:center; height:100%;
-  text-shadow:0 1px 2px rgba(0,0,0,.6);
-}
-.judge-adjust-slider{ accent-color:var(--c-primary); }
-
-/* Panel "Adjusting Judge OK/NG" SEKARANG jadi kartu lebar sendiri di bawah
-   gambar preview Run Mode (sebelumnya sempit di sidepanel kanan) - jadi
-   slider & bar hasil ukurnya dibesarkan di sini supaya jelas terbaca dari
-   jarak jauh saat didemokan ke tim, mengikuti gaya tampilan hasil ukur
-   Keyence VS Series (nomor besar, bar tebal). */
-.run-judge-panel-wrap .judge-value-bar-track{ height:44px; border-radius:8px; margin:.5rem 0 1.25rem; }
-.run-judge-panel-wrap .judge-value-bar-label{ font-size:1.3rem; font-weight:800; }
-.run-judge-panel-wrap .judge-adjust-slider{ height:1.4rem; }
-.run-judge-panel-wrap input.judge-adjust-input{ font-size:1.05rem; font-weight:700; width:7rem !important; }
-.run-judge-panel-wrap label.form-label{ font-size:1rem; }
-.run-judge-panel-wrap .fw-bold{ font-size:1.1rem; }
 
 /* ---------- Dashboard (tema gelap, khusus isi halaman Dashboard -
    sidebar/topbar TETAP tema terang seperti biasa) ---------- */
@@ -336,57 +274,3 @@ code{ background:rgba(255,255,255,.1); color:#ffd43b; padding:.1rem .35rem; bord
 .dropdown-menu{ background-color:#151b2e; border-color:var(--c-card-border); }
 .dropdown-item{ color:var(--c-text); }
 .dropdown-item:hover, .dropdown-item:focus{ background-color:rgba(255,255,255,.08); color:var(--c-text); }
-
-/* ==================================================================
-   TAMPILAN MOBILE / HP (max-width:900px)
-   ==================================================================
-   Sebelumnya sidebar 260px fixed selalu ikut ambil tempat di samping
-   konten (.app-shell{display:flex}), sehingga di layar HP (mis. 360-
-   414px lebar) konten utama tersisa hampir tidak ada ruang & semua
-   layout jadi berantakan/kepotong. Solusi: di bawah 900px, sidebar
-   diubah jadi "off-canvas" (posisi fixed, disembunyikan ke luar layar
-   kiri secara default) dan baru muncul saat tombol hamburger di
-   topbar (#navToggleBtn) diklik, dengan backdrop gelap di
-   belakangnya. CSS-only untuk struktur; toggle-nya di app.js
-   (bindMobileSidebarToggle/closeMobileSidebar) - TIDAK mengubah
-   struktur/ID/JS halaman lain, jadi fitur desktop yang sudah jalan
-   tetap aman.
-   ================================================================== */
-@media (max-width:900px){
-  .nav-toggle-btn{ display:inline-flex; align-items:center; justify-content:center; }
-
-  .sidebar{
-    position:fixed; top:0; bottom:0; left:-280px; width:260px; z-index:1050;
-    transition:left .25s ease; box-shadow:6px 0 24px rgba(0,0,0,.5);
-  }
-  .sidebar.open{ left:0; }
-
-  .topbar{ padding:0 1rem; height:56px; }
-  .topbar-title{ font-size:1rem; }
-  #userFullName{ display:none; } /* nama lengkap disembunyikan di HP supaya topbar tidak sesak, badge role tetap tampil */
-  .content-area{ padding:.85rem; }
-
-  /* Run Mode: preview kamera + panel kontrol yang tadinya berdampingan
-     (flex row) ditumpuk vertikal supaya keduanya tetap cukup lebar
-     untuk dibaca/dioperasikan di layar sempit. */
-  .run-mode-wrapper{ flex-direction:column; }
-  .run-preview{ min-height:auto; }
-  .run-sidepanel{ padding:1rem; }
-
-  .dash-dark{ padding:.85rem; }
-  .dash-kpi-row{ grid-template-columns:repeat(2,1fr); gap:.6rem; }
-
-  /* Tombol-tombol aksi (mis. toolbar ROI Editor: Ambil dari Kamera /
-     Test Images / Upload Device) yang tadinya sebaris supaya tidak
-     saling menghimpit dan tetap mudah ditekan jari. */
-  .roi-canvas-card .d-flex.flex-wrap{ gap:.5rem; }
-  .roi-canvas-card .btn-sm{ font-size:.78rem; }
-
-  .login-card{ width:92vw; padding:1.75rem; }
-}
-
-@media (max-width:480px){
-  .dash-kpi-row{ grid-template-columns:1fr 1fr; }
-  .stat-value{ font-size:1.4rem; }
-  .run-decision-badge{ font-size:1rem; padding:.5rem 1rem; top:.75rem; right:.75rem; }
-}
