@@ -125,6 +125,20 @@ function initRoiEditor() {
   const btnRoiOpenTestImage = document.getElementById('btnRoiOpenTestImage');
   if (btnRoiOpenTestImage) btnRoiOpenTestImage.onclick = openTestImagePicker;
 
+  // "Upload dari Device" - ambil gambar referensi langsung dari file yang
+  // sudah tersimpan di laptop/HP operator (bukan cuma dari kamera live atau
+  // folder Test Images bawaan aplikasi).
+  const btnRoiUploadDevice = document.getElementById('btnRoiUploadDevice');
+  const roiUploadDeviceInput = document.getElementById('roiUploadDeviceInput');
+  if (btnRoiUploadDevice && roiUploadDeviceInput) {
+    btnRoiUploadDevice.onclick = function () { roiUploadDeviceInput.click(); };
+    roiUploadDeviceInput.onchange = function (e) {
+      const file = e.target.files && e.target.files[0];
+      if (file) loadRoiImageFromDeviceFile(file);
+      roiUploadDeviceInput.value = '';
+    };
+  }
+
   document.getElementById('btnAddRoi').onclick = function () {
     if (!backgroundImage) {
       alert('Ambil gambar referensi dulu (tombol "Ambil Gambar dari Kamera" di atas) sebelum menambah ROI, supaya ROI-nya bisa digambar di atas gambar part yang benar.');
@@ -180,6 +194,45 @@ function _updateRoiEmptyState() {
     emptyState.classList.remove('d-none');
     canvas.classList.add('d-none');
   }
+}
+
+/**
+ * Muat gambar referensi ROI dari file yang dipilih langsung dari
+ * penyimpanan device (laptop/HP), bukan dari kamera live maupun folder
+ * Test Images bawaan aplikasi - berguna kalau operator sudah punya foto
+ * part hasil jepretan sebelumnya (mis. dari HP) dan ingin langsung
+ * memakainya sebagai acuan ROI tanpa foto ulang.
+ */
+function loadRoiImageFromDeviceFile(file) {
+  const statusEl = document.getElementById('roiCaptureStatus');
+  if (!file.type || file.type.indexOf('image/') !== 0) {
+    if (statusEl) statusEl.innerText = 'File yang dipilih bukan gambar.'; else alert('File yang dipilih bukan gambar.');
+    return;
+  }
+  if (statusEl) statusEl.innerText = 'Memuat gambar dari device...';
+
+  const reader = new FileReader();
+  reader.onload = function (e) {
+    const img = new Image();
+    img.onload = function () {
+      const canvasEl = document.getElementById('roiCanvas');
+      const tmp = document.createElement('canvas');
+      tmp.width = img.naturalWidth;
+      tmp.height = img.naturalHeight;
+      tmp.getContext('2d').drawImage(img, 0, 0);
+      backgroundImage = tmp;
+      canvasEl.width = tmp.width;
+      canvasEl.height = tmp.height;
+
+      _updateRoiEmptyState();
+      redrawCanvas();
+      if (statusEl) statusEl.innerText = 'Gambar referensi dimuat dari device (' + tmp.width + 'x' + tmp.height + ').';
+    };
+    img.onerror = function () { if (statusEl) statusEl.innerText = 'Gagal membaca file gambar tersebut.'; };
+    img.src = e.target.result;
+  };
+  reader.onerror = function () { if (statusEl) statusEl.innerText = 'Gagal membaca file dari device.'; };
+  reader.readAsDataURL(file);
 }
 
 /**

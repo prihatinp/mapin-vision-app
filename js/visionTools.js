@@ -443,15 +443,23 @@ let runOkCount = 0, runNgCount = 0;
 let runStream = null;
 let pollIntervalId = null; // trigger EXTERNAL (polling status IO)
 let internalTriggerIntervalId = null; // trigger INTERNAL (timer capture otomatis)
+let runStaticTestImage = null; // canvas gambar test yang diupload dari device (dipakai sbg pengganti frame kamera)
 
 function initRunMode() {
-  startRunCamera();
+  // Kamera TIDAK otomatis menyala saat Run Mode dibuka - operator memilih
+  // dulu mau pakai kamera live ("Nyalakan Kamera (Live)") atau upload
+  // gambar test dari device. Sebelumnya kamera otomatis nyala begitu
+  // halaman dibuka, yang bikin operator tidak sempat memilih upload gambar
+  // sebelum kamera "menimpa" preview-nya.
+  runStaticTestImage = null;
 
   const resSelect = document.getElementById('runResolutionSelect');
-  if (resSelect) resSelect.onchange = startRunCamera; // ganti resolusi -> nyalakan ulang stream dgn ukuran baru
+  if (resSelect) resSelect.onchange = function () { if (runStream) startRunCamera(); }; // ganti resolusi -> nyalakan ulang stream HANYA kalau kamera sedang live
 
   const btnRunStopCamera = document.getElementById('btnRunStopCamera');
   if (btnRunStopCamera) btnRunStopCamera.onclick = toggleRunCamera;
+
+  initRunUploadImageControls();
 
   // Muat recipe yang sedang AKTIF (ditandai "Aktifkan" di Recipe Management) -
   // SEBELUMNYA Run Mode memakai window.ACTIVE_RECIPE_ID yang tidak pernah
@@ -492,7 +500,9 @@ function initRunMode() {
     runPollingActive = !runPollingActive;
     this.innerText = runPollingActive ? 'Pause Trigger' : 'Resume Trigger';
   };
-  document.getElementById('btnRecapture').onclick = runInspectionCycle;
+  // "Measure (Trigger 1x)" - klik manual selalu langsung mengukur 1 kali,
+  // baik pakai kamera live maupun gambar test yang sudah diupload.
+  document.getElementById('btnRecapture').onclick = function () { runInspectionCycle(true); };
 
   initTriggerModeControls();
   initJudgeAdjustPanel();
@@ -519,16 +529,105 @@ function startRunCamera() {
 
   navigator.mediaDevices.getUserMedia({ video: { width: { ideal: w }, height: { ideal: h } } }).then(function (stream) {
     runStream = stream;
+
+    // Kamera live menggantikan gambar test yang mungkin sedang tampil.
+    runStaticTestImage = null;
+    const previewImg = document.getElementById('runTestImagePreview');
+    if (previewImg) previewImg.classList.add('d-none');
+    const statusEl = document.getElementById('runUploadImageStatus');
+    if (statusEl) statusEl.innerText = '';
+
     const runVideoEl = document.getElementById('runVideo');
+    runVideoEl.classList.remove('d-none');
     runVideoEl.muted = true; // wajib agar autoplay tidak diblokir browser
     runVideoEl.srcObject = stream;
     runVideoEl.play().catch(function (playErr) { console.warn('video.play() gagal:', playErr); });
     document.getElementById('runCameraOffOverlay').classList.add('d-none');
     const btn = document.getElementById('btnRunStopCamera');
-    if (btn) { btn.innerText = 'Matikan Kamera'; btn.classList.replace('btn-outline-success', 'btn-outline-danger'); }
+    if (btn) { btn.innerText = 'Matikan Kamera'; btn.classList.remove('btn-outline-success'); btn.classList.add('btn-outline-danger'); }
+
+    // Kamera baru nyala -> trigger boleh mulai jalan lagi.
+    runPollingActive = true;
+    const btnPause = document.getElementById('btnPause');
+    if (btnPause) btnPause.innerText = 'Pause Trigger';
+    startSelectedTriggerLoop();
   }).catch(function (err) {
     alert('Gagal mengakses kamera untuk Run Mode: ' + err.message);
   });
+}
+
+/**
+ * Tombol "Upload Gambar Test" di Run Mode - dipakai kalau operator ingin
+ * menguji recipe dengan foto yang sudah ada (dari laptop/HP) tanpa perlu
+ * kamera live menyala. Gambar yang diupload TIDAK otomatis diukur -
+ * operator harus klik "Measure (Trigger 1x)" supaya jelas kapan siklus
+ * pengukuran benar-benar terjadi (sesuai permintaan: gambar tampil dulu,
+ * baru diukur saat tombol trigger diklik).
+ */
+function initRunUploadImageControls() {
+  const btn = document.getElementById('btnRunUploadImage');
+  const input = document.getElementById('runUploadImageInput');
+  const statusEl = document.getElementById('runUploadImageStatus');
+  if (!btn || !input) return;
+
+  btn.onclick = function () { input.click(); };
+
+  input.onchange = function (e) {
+    const file = e.target.files && e.target.files[0];
+    input.value = '';
+    if (!file) return;
+    if (!file.type || file.type.indexOf('image/') !== 0) {
+      if (statusEl) statusEl.innerText = 'File yang dipilih bukan gambar.';
+      return;
+    }
+    if (!ACTIVE_RECIPE) {
+      alert('Belum ada recipe aktif untuk diuji. Pastikan sudah ada recipe yang diaktifkan di Recipe Management.');
+      return;
+    }
+    if (statusEl) statusEl.innerText = 'Memuat gambar...';
+
+    const reader = new FileReader();
+    reader.onload = function (ev) {
+      const img = new Image();
+      img.onload = function () {
+        // Matikan kamera live kalau sedang menyala - gambar upload menggantikannya.
+        if (runStream) {
+          runStream.getTracks().forEach(function (t) { t.stop(); });
+          runStream = null;
+        }
+        runPollingActive = false; // trigger otomatis dihentikan dulu; operator klik Measure manual
+        const btnPause = document.getElementById('btnPause');
+        if (btnPause) btnPause.innerText = 'Resume Trigger';
+
+        const tmp = document.createElement('canvas');
+        tmp.width = img.naturalWidth;
+        tmp.height = img.naturalHeight;
+        tmp.getContext('2d').drawImage(img, 0, 0);
+        runStaticTestImage = tmp;
+
+        const previewImg = document.getElementById('runTestImagePreview');
+        previewImg.src = ev.target.result;
+        previewImg.classList.remove('d-none');
+        document.getElementById('runVideo').classList.add('d-none');
+        document.getElementById('runCameraOffOverlay').classList.add('d-none');
+
+        const overlayEl = document.getElementById('runOverlay');
+        overlayEl.width = img.naturalWidth;
+        overlayEl.height = img.naturalHeight;
+        overlayEl.getContext('2d').clearRect(0, 0, overlayEl.width, overlayEl.height);
+
+        const badge = document.getElementById('runDecisionBadge');
+        badge.innerText = 'READY';
+        badge.className = 'run-decision-badge';
+
+        if (statusEl) statusEl.innerText = 'Gambar "' + file.name + '" siap. Klik "Measure (Trigger 1x)" di bawah untuk mengukur.';
+      };
+      img.onerror = function () { if (statusEl) statusEl.innerText = 'Gagal membaca file gambar tersebut.'; };
+      img.src = ev.target.result;
+    };
+    reader.onerror = function () { if (statusEl) statusEl.innerText = 'Gagal membaca file dari device.'; };
+    reader.readAsDataURL(file);
+  };
 }
 
 /**
@@ -545,8 +644,9 @@ function toggleRunCamera() {
     runStream.getTracks().forEach(function (t) { t.stop(); });
     runStream = null;
     document.getElementById('runVideo').srcObject = null;
+    document.getElementById('runVideo').classList.add('d-none');
     overlay.classList.remove('d-none');
-    if (btn) { btn.innerText = 'Nyalakan Kamera'; btn.classList.replace('btn-outline-danger', 'btn-outline-success'); }
+    if (btn) { btn.innerText = 'Nyalakan Kamera (Live)'; btn.classList.remove('btn-outline-danger'); btn.classList.add('btn-outline-success'); }
     runPollingActive = false; // tidak ada gunanya trigger jalan kalau kamera mati
     const btnPause = document.getElementById('btnPause');
     if (btnPause) btnPause.innerText = 'Resume Trigger';
@@ -622,6 +722,7 @@ function stopRunMode() {
   }
   const runVideoEl = document.getElementById('runVideo');
   if (runVideoEl) runVideoEl.srcObject = null;
+  runStaticTestImage = null;
 }
 
 /* ==================================================================
@@ -669,18 +770,25 @@ function initJudgeAdjustPanel() {
 /** Daftar field parameter utama yang bisa di-adjust per tipe tool (input id -> params key). */
 function _judgeAdjustFieldsForType(type) {
   switch (type) {
-    case 'PatternMatch': return [{ key: 'threshold', label: 'Threshold Similarity (0-1)', step: 0.01 }];
-    case 'Blob': return [{ key: 'minAreaMm2', label: 'Min Area Defect (mm²)', step: 0.01 }];
-    case 'EdgeDimension': return [{ key: 'toleranceMm', label: 'Toleransi (mm)', step: 0.01 }, { key: 'nominalMm', label: 'Nominal (mm)', step: 0.01 }];
-    case 'Presence': return [{ key: 'pixelThresholdPct', label: 'Threshold Piksel (%)', step: 0.1 }];
-    case 'Color': return [{ key: 'threshold', label: 'Toleransi (+/-)', step: 1 }, { key: 'targetMean', label: 'Target Mean (0-255)', step: 1 }];
-    case 'Counting': return [{ key: 'expectedMin', label: 'Jumlah Minimum', step: 1 }, { key: 'expectedMax', label: 'Jumlah Maksimum', step: 1 }];
-    case 'AIClassification': return [{ key: 'confidenceThreshold', label: 'Confidence Threshold (0-1)', step: 0.01 }];
-    case 'AIDetection': return [{ key: 'confidenceThreshold', label: 'Confidence Threshold (0-1)', step: 0.01 }];
+    case 'PatternMatch': return [{ key: 'threshold', label: 'Threshold Similarity (0-1)', step: 0.01, min: 0, max: 1 }];
+    case 'Blob': return [{ key: 'minAreaMm2', label: 'Min Area Defect (mm²)', step: 0.01, min: 0, max: 100 }];
+    case 'EdgeDimension': return [{ key: 'toleranceMm', label: 'Toleransi (mm)', step: 0.01, min: 0, max: 20 }, { key: 'nominalMm', label: 'Nominal (mm)', step: 0.01, min: 0, max: 500 }];
+    case 'Presence': return [{ key: 'pixelThresholdPct', label: 'Threshold Piksel (%)', step: 0.1, min: 0, max: 100 }];
+    case 'Color': return [{ key: 'threshold', label: 'Toleransi (+/-)', step: 1, min: 0, max: 100 }, { key: 'targetMean', label: 'Target Mean (0-255)', step: 1, min: 0, max: 255 }];
+    case 'Counting': return [{ key: 'expectedMin', label: 'Jumlah Minimum', step: 1, min: 0, max: 50 }, { key: 'expectedMax', label: 'Jumlah Maksimum', step: 1, min: 0, max: 50 }];
+    case 'AIClassification': return [{ key: 'confidenceThreshold', label: 'Confidence Threshold (0-1)', step: 0.01, min: 0, max: 1 }];
+    case 'AIDetection': return [{ key: 'confidenceThreshold', label: 'Confidence Threshold (0-1)', step: 0.01, min: 0, max: 1 }];
     default: return []; // QR/Barcode/OCR: berbasis rule teks, bukan angka - tidak ada quick-adjust di sini
   }
 }
 
+/**
+ * Panel "Adjusting Judge OK/NG" - tiap parameter ditampilkan sebagai
+ * slider (mudah digeser cepat, ala Keyence VS Series) + input angka
+ * (untuk nilai presisi), DITAMBAH bar nilai hasil pembacaan langsung
+ * (judge-value-bar) yang nanti diisi/diwarnai oleh updateJudgeValueBars()
+ * setiap kali ada hasil inspeksi baru.
+ */
 function renderJudgeAdjustList() {
   const listEl = document.getElementById('judgeAdjustList');
   if (!listEl || !ACTIVE_RECIPE) return;
@@ -695,16 +803,50 @@ function renderJudgeAdjustList() {
     const roi = (ACTIVE_RECIPE.rois || []).find(function (r) { return r.id === tool.roiId; });
 
     const wrap = document.createElement('div');
-    wrap.className = 'mb-2 pb-2 border-bottom';
-    let html = '<div class="fw-bold">' + toolTypeLabel(tool.type) + (roi ? ' &middot; ' + roi.name : '') + '</div>';
+    wrap.className = 'mb-3 pb-2 border-bottom';
+    let html = '<div class="fw-bold mb-1">' + toolTypeLabel(tool.type) + (roi ? ' &middot; ' + roi.name : '') + '</div>';
     fields.forEach(function (f) {
-      const val = tool.params && tool.params[f.key] != null ? tool.params[f.key] : '';
+      const val = tool.params && tool.params[f.key] != null ? tool.params[f.key] : (f.min != null ? f.min : 0);
+      const barId = 'judgeBar_' + tool.id + '_' + f.key;
       html += '<label class="form-label small mb-0 mt-1">' + f.label + '</label>' +
-        '<input type="number" step="' + f.step + '" class="form-control form-control-sm judge-adjust-input" ' +
-        'data-tool-id="' + tool.id + '" data-param-key="' + f.key + '" value="' + val + '">';
+        '<div class="d-flex align-items-center gap-2">' +
+        '<input type="range" class="form-range judge-adjust-slider flex-fill" min="' + f.min + '" max="' + f.max + '" step="' + f.step + '" ' +
+        'data-tool-id="' + tool.id + '" data-param-key="' + f.key + '" data-min="' + f.min + '" data-max="' + f.max + '" value="' + val + '">' +
+        '<input type="number" step="' + f.step + '" class="form-control form-control-sm judge-adjust-input" style="width:5.5rem;" ' +
+        'data-tool-id="' + tool.id + '" data-param-key="' + f.key + '" value="' + val + '">' +
+        '</div>' +
+        '<div class="judge-value-bar-track" id="' + barId + '">' +
+        '<div class="judge-value-bar-fill" id="' + barId + '_fill"></div>' +
+        '<div class="judge-value-bar-label" id="' + barId + '_label">-</div>' +
+        '</div>';
     });
     wrap.innerHTML = html;
     listEl.appendChild(wrap);
+  });
+
+  attachJudgeInputSync();
+}
+
+/**
+ * Sinkronisasi 2 arah antara slider (.judge-adjust-slider) dan input angka
+ * (.judge-adjust-input) yang berbagi data-tool-id/data-param-key yang sama,
+ * sekaligus langsung update ACTIVE_RECIPE.tools[].params setiap kali nilai
+ * berubah (supaya "Terapkan (Live)" / "Simpan ke Recipe" memakai nilai
+ * terbaru tanpa perlu langkah tambahan).
+ */
+function attachJudgeInputSync() {
+  document.querySelectorAll('.judge-adjust-slider').forEach(function (slider) {
+    const toolId = slider.getAttribute('data-tool-id');
+    const paramKey = slider.getAttribute('data-param-key');
+    const pairedInput = document.querySelector('.judge-adjust-input[data-tool-id="' + toolId + '"][data-param-key="' + paramKey + '"]');
+    const syncValue = function (value) {
+      slider.value = value;
+      if (pairedInput) pairedInput.value = value;
+      const tool = (ACTIVE_RECIPE.tools || []).find(function (t) { return t.id === toolId; });
+      if (tool) { tool.params = tool.params || {}; tool.params[paramKey] = parseFloat(value); }
+    };
+    slider.oninput = function () { syncValue(slider.value); };
+    if (pairedInput) pairedInput.oninput = function () { syncValue(pairedInput.value); };
   });
 }
 
@@ -728,7 +870,7 @@ function applyJudgeAdjustments() {
   }
 }
 
-async function runInspectionCycle() {
+async function runInspectionCycle(isManualTrigger) {
   if (!ACTIVE_RECIPE) return;
 
   // Pastikan opencv.js sudah selesai dimuat sebelum dipakai (lihat catatan di
@@ -740,11 +882,34 @@ async function runInspectionCycle() {
 
   const startMs = performance.now();
 
-  const video = document.getElementById('runVideo');
-  const fullCanvas = document.createElement('canvas');
-  fullCanvas.width = video.videoWidth;
-  fullCanvas.height = video.videoHeight;
-  fullCanvas.getContext('2d').drawImage(video, 0, 0);
+  // Sumber gambar: gambar test yang diupload dari device (kalau ada), atau
+  // frame kamera live. SEBELUMNYA kode ini langsung ambil dari <video> tanpa
+  // cek apakah kamera benar-benar menyala, dan kalau belum ready akan
+  // memicu alert() berulang-ulang saat dipanggil dari trigger otomatis
+  // (setInterval) sehingga halaman terasa "nge-hang"/crash. Sekarang siklus
+  // otomatis dilewati secara diam-diam (console.warn saja) kalau memang
+  // belum ada sumber gambar, sementara klik manual "Measure" menampilkan
+  // pesan status yang jelas (bukan alert() yang memblokir).
+  let fullCanvas;
+  if (runStaticTestImage) {
+    fullCanvas = runStaticTestImage;
+  } else {
+    const video = document.getElementById('runVideo');
+    if (!video.videoWidth) {
+      const msg = 'Kamera belum menyala dan belum ada gambar test yang diupload. Klik "Nyalakan Kamera (Live)" atau "Upload Gambar Test" dulu.';
+      if (isManualTrigger) {
+        const statusEl = document.getElementById('runUploadImageStatus');
+        if (statusEl) statusEl.innerHTML = '<span class="text-danger">' + msg + '</span>';
+      } else {
+        console.warn('Siklus trigger otomatis dilewati:', msg);
+      }
+      return;
+    }
+    fullCanvas = document.createElement('canvas');
+    fullCanvas.width = video.videoWidth;
+    fullCanvas.height = video.videoHeight;
+    fullCanvas.getContext('2d').drawImage(video, 0, 0);
+  }
 
   const overlay = document.getElementById('runOverlay');
   overlay.width = fullCanvas.width;
@@ -800,7 +965,13 @@ async function runInspectionCycle() {
     imageBase64: fullCanvas.toDataURL('image/jpeg', 0.85),
     recipeId: ACTIVE_RECIPE.id,
     toolResults: toolResults,
-    clientProcessingMs: clientProcessingMs
+    clientProcessingMs: clientProcessingMs,
+    // Kirim parameter tool yang mungkin sudah di-geser di panel "Adjusting
+    // Judge OK/NG" - SEBELUMNYA server selalu ambil ulang recipe murni dari
+    // Spreadsheet, jadi geseran slider di sini cuma kosmetik dan tidak
+    // pernah benar-benar mempengaruhi hasil OK/NG. toolsOverride membuat
+    // "Terapkan (Live)" sungguhan berlaku untuk siklus berikutnya.
+    toolsOverride: ACTIVE_RECIPE.tools
   }, CURRENT_SESSION]).then(function (res) {
     if (res.success === false) { console.warn('Inspeksi gagal:', res.error); return; }
     updateRunModeUi(res);
@@ -847,4 +1018,38 @@ function updateRunModeUi(res) {
   detailDiv.innerHTML = res.ngReasons.map(function (r) {
     return r.type + ': ' + r.reason;
   }).join('<br>');
+
+  updateJudgeValueBars(res.toolResults);
+}
+
+/**
+ * Isi bar "Adjusting Judge OK/NG" dengan nilai hasil pengukuran yang baru
+ * saja diperoleh - posisi bar (%) dihitung dari rentang min/max slider
+ * yang bersangkutan, warnanya hijau kalau tool ini PASS dan merah kalau
+ * FAIL (bukan cuma keputusan akhir OK/NG recipe, tapi per-tool).
+ */
+function updateJudgeValueBars(toolResults) {
+  if (!toolResults || !toolResults.length) return;
+  document.querySelectorAll('.judge-adjust-slider').forEach(function (slider) {
+    const toolId = slider.getAttribute('data-tool-id');
+    const paramKey = slider.getAttribute('data-param-key');
+    const tr = toolResults.find(function (t) { return t.toolId === toolId; });
+    if (!tr || tr.value == null || isNaN(Number(tr.value))) return;
+
+    const min = parseFloat(slider.getAttribute('data-min'));
+    const max = parseFloat(slider.getAttribute('data-max'));
+    const value = Number(tr.value);
+    let pct = max > min ? ((value - min) / (max - min)) * 100 : 0;
+    pct = Math.max(0, Math.min(100, pct));
+
+    const barId = 'judgeBar_' + toolId + '_' + paramKey;
+    const fillEl = document.getElementById(barId + '_fill');
+    const labelEl = document.getElementById(barId + '_label');
+    if (fillEl) {
+      fillEl.style.width = pct + '%';
+      fillEl.classList.remove('ok', 'ng');
+      fillEl.classList.add(tr.passFail === false ? 'ng' : 'ok');
+    }
+    if (labelEl) labelEl.innerText = (Math.round(value * 100) / 100) + (tr.passFail === false ? ' (NG)' : ' (OK)');
+  });
 }

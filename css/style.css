@@ -45,6 +45,8 @@ body{
 .login-screen{ min-height:100vh; background:radial-gradient(circle at top left,#0d2b4f,#050a14); }
 .login-card{ width:380px; padding:2.5rem; }
 .logo-placeholder{ width:48px; opacity:.9; }
+.login-logo-box{ background:#fff; border-radius:14px; padding:1rem 1.25rem; display:inline-block; box-shadow:0 4px 16px rgba(0,0,0,.25); }
+.login-logo-img{ max-width:280px; width:100%; height:auto; display:block; }
 .brand-title{ font-weight:800; color:#fff; letter-spacing:1px; }
 .text-accent{ color:#ff6b6b; }
 .brand-tagline{ color:#7fb8ff; font-size:.85rem; font-style:italic; }
@@ -58,10 +60,18 @@ body{
   color:#fff; display:flex; flex-direction:column; padding:1.25rem 0;
   position:sticky; top:0; height:100vh;
 }
-.sidebar-brand{ display:flex; align-items:center; gap:.6rem; padding:0 1.25rem 1.25rem; border-bottom:1px solid rgba(255,255,255,.15); }
+.sidebar-brand{ padding:1.1rem 1.1rem 1.25rem; border-bottom:1px solid rgba(255,255,255,.15); }
+.sidebar-logo-box{ background:#fff; border-radius:10px; padding:.55rem .7rem; }
+.sidebar-logo-img{ width:100%; height:auto; display:block; }
 .brand-icon{ font-size:32px; color:var(--c-accent); }
 .brand-name{ font-weight:700; font-size:.95rem; letter-spacing:.5px; }
 .brand-sub{ font-size:.7rem; opacity:.7; }
+
+.nav-toggle-btn{ display:none; background:none; border:none; color:var(--c-text); font-size:0; padding:.4rem; border-radius:8px; cursor:pointer; line-height:0; flex-shrink:0; }
+.nav-toggle-btn .material-icons{ font-size:24px; }
+.nav-toggle-btn:hover{ background:rgba(255,255,255,.08); }
+.sidebar-backdrop{ display:none; position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:1040; }
+.sidebar-backdrop.show{ display:block; }
 
 .nav-menu{ list-style:none; padding:1rem 0; margin:0; flex:1; overflow-y:auto; }
 .nav-menu li{
@@ -99,7 +109,7 @@ body{
 /* ---------- Camera / Run Mode ---------- */
 .camera-preview-card, .roi-canvas-card{ position:relative; padding:.5rem; overflow:hidden; }
 .camera-preview-card video{ width:100%; border-radius:var(--radius-md); background:#000; }
-#cameraOverlay, #runOverlay{ position:absolute; top:.5rem; left:.5rem; pointer-events:none; }
+#cameraOverlay, #runOverlay{ position:absolute; top:.5rem; left:.5rem; width:calc(100% - 1rem); height:auto; pointer-events:none; }
 
 /* Kanvas ROI Editor SEBELUMNYA dirender di ukuran piksel ASLI gambar
    (mis. 1920x1080) tanpa mengecil menyesuaikan lebar kartu, sehingga
@@ -137,6 +147,21 @@ body{
 .run-decision-badge.ng{ background:var(--c-accent); }
 .run-sidepanel{ flex:1; padding:1.25rem; }
 .run-counter{ display:flex; justify-content:space-between; padding:.5rem 0; border-bottom:1px dashed var(--c-card-border); }
+
+/* ---------- Judge OK/NG value bars (Keyence VS-style live threshold) ---------- */
+.judge-value-bar-track{ position:relative; height:20px; border-radius:6px; background:rgba(255,255,255,.06); border:1px solid var(--c-card-border); margin:.3rem 0 .6rem; overflow:hidden; }
+.judge-value-bar-fill{ position:absolute; top:0; left:0; bottom:0; width:0%; background:#666; transition:width .2s ease, background-color .2s ease; }
+.judge-value-bar-fill.ok{ background:var(--c-success); }
+.judge-value-bar-fill.ng{ background:#ff6b6b; }
+.judge-value-bar-label{ position:relative; z-index:1; font-size:.7rem; font-weight:700; color:var(--c-text); display:flex; align-items:center; justify-content:center; height:100%; text-shadow:0 1px 2px rgba(0,0,0,.6); }
+.judge-adjust-slider{ accent-color:var(--c-primary); }
+
+.run-judge-panel-wrap .judge-value-bar-track{ height:44px; border-radius:8px; margin:.5rem 0 1.25rem; }
+.run-judge-panel-wrap .judge-value-bar-label{ font-size:1.3rem; font-weight:800; }
+.run-judge-panel-wrap .judge-adjust-slider{ height:1.4rem; }
+.run-judge-panel-wrap input.judge-adjust-input{ font-size:1.05rem; font-weight:700; width:7rem !important; }
+.run-judge-panel-wrap label.form-label{ font-size:1rem; }
+.run-judge-panel-wrap .fw-bold{ font-size:1.1rem; }
 
 /* ---------- Dashboard (tema gelap, khusus isi halaman Dashboard -
    sidebar/topbar TETAP tema terang seperti biasa) ---------- */
@@ -274,3 +299,43 @@ code{ background:rgba(255,255,255,.1); color:#ffd43b; padding:.1rem .35rem; bord
 .dropdown-menu{ background-color:#151b2e; border-color:var(--c-card-border); }
 .dropdown-item{ color:var(--c-text); }
 .dropdown-item:hover, .dropdown-item:focus{ background-color:rgba(255,255,255,.08); color:var(--c-text); }
+
+/* ==================================================================
+   RESPONSIVE - Mobile (HP) & Tablet
+   Sidebar jadi drawer yang muncul dari kiri (tombol hamburger di
+   topbar), konten menyesuaikan lebar layar supaya tidak "kacau"
+   saat dibuka dari browser HP.
+   ================================================================== */
+@media (max-width:900px){
+  .nav-toggle-btn{ display:inline-flex; align-items:center; justify-content:center; }
+  .sidebar{
+    position:fixed; top:0; bottom:0; left:-280px; width:260px; z-index:1050;
+    transition:left .25s ease; box-shadow:4px 0 24px rgba(0,0,0,.5);
+  }
+  .sidebar.open{ left:0; }
+  .app-shell{ display:block; }
+  .main-content{ min-height:100vh; }
+  .topbar{ padding:0 1rem; }
+  .topbar-title{ font-size:1rem; }
+  .content-area{ padding:1rem; }
+  #userFullName{ display:none; }
+  .badge-role{ margin-right:0; }
+
+  .run-mode-wrapper{ flex-direction:column; }
+  .run-preview{ min-height:auto; }
+  .run-sidepanel{ padding:1rem; }
+
+  .dash-kpi-row{ grid-template-columns:repeat(2,1fr); }
+
+  .login-card{ width:92vw; padding:1.75rem 1.25rem; }
+
+  .run-judge-panel-wrap input.judge-adjust-input{ width:5.5rem !important; }
+}
+
+@media (max-width:480px){
+  .stat-value{ font-size:1.4rem; }
+  .dash-kpi-value{ font-size:1.2rem; }
+  .run-decision-badge{ top:.75rem; right:.75rem; padding:.5rem 1rem; font-size:1rem; }
+  .login-card{ padding:1.25rem 1rem; }
+  .login-logo-img{ max-width:200px; }
+}

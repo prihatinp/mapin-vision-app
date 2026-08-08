@@ -84,8 +84,35 @@ function bindNav() {
       li.classList.add('active');
       const view = li.getAttribute('data-view');
       showView(view);
+      closeMobileSidebar();
     });
   });
+  bindMobileSidebarToggle();
+}
+
+/**
+ * Sidebar di layar HP/tablet sempit (<=900px, lihat @media di style.css)
+ * disembunyikan sebagai drawer yang muncul dari kiri saat tombol hamburger
+ * (#navToggleBtn) di topbar diklik, supaya tampilan tidak "kacau" (menu
+ * memenuhi layar) saat dibuka dari browser HP.
+ */
+function bindMobileSidebarToggle() {
+  const toggleBtn = document.getElementById('navToggleBtn');
+  const sidebar = document.getElementById('sidebarNav');
+  const backdrop = document.getElementById('sidebarBackdrop');
+  if (!toggleBtn || !sidebar || !backdrop) return;
+  toggleBtn.addEventListener('click', function () {
+    sidebar.classList.toggle('open');
+    backdrop.classList.toggle('show');
+  });
+  backdrop.addEventListener('click', closeMobileSidebar);
+}
+
+function closeMobileSidebar() {
+  const sidebar = document.getElementById('sidebarNav');
+  const backdrop = document.getElementById('sidebarBackdrop');
+  if (sidebar) sidebar.classList.remove('open');
+  if (backdrop) backdrop.classList.remove('show');
 }
 
 let _currentViewName = null;
