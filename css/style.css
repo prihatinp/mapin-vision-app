@@ -145,6 +145,8 @@ body{
 }
 .run-decision-badge.ok{ background:var(--c-success); }
 .run-decision-badge.ng{ background:var(--c-accent); }
+.run-decision-badge.measuring{ background:var(--c-secondary); animation:measuringPulse 1s ease-in-out infinite; }
+@keyframes measuringPulse{ 0%,100%{ opacity:1; } 50%{ opacity:.55; } }
 .run-sidepanel{ flex:1; padding:1.25rem; }
 .run-counter{ display:flex; justify-content:space-between; padding:.5rem 0; border-bottom:1px dashed var(--c-card-border); }
 

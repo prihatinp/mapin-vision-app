@@ -84,16 +84,27 @@ const VisionTools = {
     cv.findContours(thresh, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
 
     let maxAreaPx = 0;
+    let maxContourIdx = -1;
     for (let i = 0; i < contours.size(); i++) {
       const area = cv.contourArea(contours.get(i));
-      if (area > maxAreaPx) maxAreaPx = area;
+      if (area > maxAreaPx) { maxAreaPx = area; maxContourIdx = i; }
+    }
+
+    // Simpan bounding box (posisi piksel) dari kontur defect TERBESAR, supaya
+    // Run Mode bisa menggambar kotak merah TEPAT di lokasi defect-nya pada
+    // hasil NG (lihat drawNgOverlayForResults), bukan cuma menampilkan angka
+    // luas defect saja seperti sebelumnya.
+    let bboxPx = null;
+    if (maxContourIdx !== -1) {
+      const rect = cv.boundingRect(contours.get(maxContourIdx));
+      bboxPx = { x: rect.x, y: rect.y, w: rect.width, h: rect.height };
     }
 
     const scale = scaleFactorPxPerMm || 1;
     const areaMm2 = maxAreaPx / (scale * scale);
 
     src.delete(); gray.delete(); thresh.delete(); contours.delete(); hierarchy.delete();
-    return { rawScore: areaMm2 };
+    return { rawScore: areaMm2, bboxPx: bboxPx };
   },
 
   /**
@@ -123,7 +134,9 @@ const VisionTools = {
     const distanceMm = distancePx / scale;
 
     src.delete(); gray.delete(); edges.delete();
-    return { rawScore: distanceMm };
+    // edgeMinPx/edgeMaxPx dikembalikan supaya Run Mode bisa menggambar garis
+    // TEPAT di kedua tepi yang diukur pada hasil NG (lihat drawNgOverlayForResults).
+    return { rawScore: distanceMm, edgeMinPx: minVal || 0, edgeMaxPx: maxVal || 0, axis: axis || 'x' };
   },
 
   /**
@@ -444,6 +457,7 @@ let runStream = null;
 let pollIntervalId = null; // trigger EXTERNAL (polling status IO)
 let internalTriggerIntervalId = null; // trigger INTERNAL (timer capture otomatis)
 let runStaticTestImage = null; // canvas gambar test yang diupload dari device (dipakai sbg pengganti frame kamera)
+let lastToolVisualData = {}; // toolId -> info posisi (offset ROI, bbox defect, dsb.) siklus inspeksi terakhir, dipakai untuk menandai lokasi penyebab NG pada gambar (lihat drawNgOverlayForResults)
 
 function initRunMode() {
   // Kamera TIDAK otomatis menyala saat Run Mode dibuka - operator memilih
@@ -911,11 +925,30 @@ async function runInspectionCycle(isManualTrigger) {
     fullCanvas.getContext('2d').drawImage(video, 0, 0);
   }
 
+  // Indikator "sedang mengukur" - SEBELUMNYA badge diam saja dari klik
+  // Measure sampai hasil OK/NG keluar, jadi operator tidak tahu apakah
+  // prosesnya jalan atau macet. Sekarang badge langsung berubah jadi
+  // "MENGUKUR..." (dengan animasi berdenyut, lihat .measuring di
+  // style.css) dan tombol Measure di-nonaktifkan sementara, supaya jelas
+  // ada proses berjalan, sampai hasil OK/NG tampil atau terjadi error.
+  const badgeEl = document.getElementById('runDecisionBadge');
+  badgeEl.innerText = 'MENGUKUR...';
+  badgeEl.className = 'run-decision-badge measuring';
+  const btnMeasureEl = document.getElementById('btnRecapture');
+  if (btnMeasureEl) btnMeasureEl.disabled = true;
+
   const overlay = document.getElementById('runOverlay');
   overlay.width = fullCanvas.width;
   overlay.height = fullCanvas.height;
   const overlayCtx = overlay.getContext('2d');
   overlayCtx.clearRect(0, 0, overlay.width, overlay.height);
+
+  // Menyimpan info posisi (offset ROI, bounding box defect, dsb.) tiap tool
+  // di siklus ini, supaya SETELAH server mengembalikan keputusan OK/NG per
+  // tool, kita bisa menggambar tanda visual TEPAT di lokasi penyebab NG-nya
+  // pada gambar - meniru cara kerja Keyence IV/VS Series yang menandai
+  // langsung area penyebab NG pada foto hasil (bukan cuma angka di tabel).
+  lastToolVisualData = {};
 
   const toolResults = [];
   for (const tool of ACTIVE_RECIPE.tools) {
@@ -925,11 +958,26 @@ async function runInspectionCycle(isManualTrigger) {
     const roiOffsetY = roi ? Math.min.apply(null, roi.points.map(function (p) { return p.y; })) : 0;
     const scale = (ACTIVE_RECIPE.calibration || {}).scaleFactorPxPerMm || 1;
 
+    lastToolVisualData[tool.id] = {
+      type: tool.type, roiOffsetX: roiOffsetX, roiOffsetY: roiOffsetY,
+      roiWidth: roiCanvas.width, roiHeight: roiCanvas.height
+    };
+
     let output;
     switch (tool.type) {
       case 'PatternMatch': output = VisionTools.patternMatch(roiCanvas, TemplateCache.cache[tool.id]); break;
-      case 'Blob': output = VisionTools.blobDefectArea(roiCanvas, scale); break;
-      case 'EdgeDimension': output = VisionTools.edgeDimension(roiCanvas, scale, tool.params.axis); break;
+      case 'Blob': {
+        output = VisionTools.blobDefectArea(roiCanvas, scale);
+        if (output.bboxPx) lastToolVisualData[tool.id].bboxPx = output.bboxPx;
+        break;
+      }
+      case 'EdgeDimension': {
+        output = VisionTools.edgeDimension(roiCanvas, scale, tool.params.axis);
+        lastToolVisualData[tool.id].edgeMinPx = output.edgeMinPx;
+        lastToolVisualData[tool.id].edgeMaxPx = output.edgeMaxPx;
+        lastToolVisualData[tool.id].axis = output.axis;
+        break;
+      }
       case 'Presence': output = VisionTools.presenceAbsence(roiCanvas, tool.params.pixelThresholdPct); break;
       case 'Color': output = VisionTools.colorInspection(roiCanvas); break;
       case 'QR': output = VisionTools.readQrCode(roiCanvas); break;
@@ -973,9 +1021,20 @@ async function runInspectionCycle(isManualTrigger) {
     // "Terapkan (Live)" sungguhan berlaku untuk siklus berikutnya.
     toolsOverride: ACTIVE_RECIPE.tools
   }, CURRENT_SESSION]).then(function (res) {
-    if (res.success === false) { console.warn('Inspeksi gagal:', res.error); return; }
+    if (btnMeasureEl) btnMeasureEl.disabled = false;
+    if (res.success === false) {
+      console.warn('Inspeksi gagal:', res.error);
+      badgeEl.innerText = 'ERROR';
+      badgeEl.className = 'run-decision-badge';
+      return;
+    }
     updateRunModeUi(res);
-  }).catch(function (err) { console.warn('Inspeksi gagal:', err.message); });
+  }).catch(function (err) {
+    console.warn('Inspeksi gagal:', err.message);
+    if (btnMeasureEl) btnMeasureEl.disabled = false;
+    badgeEl.innerText = 'ERROR';
+    badgeEl.className = 'run-decision-badge';
+  });
 }
 
 /**
@@ -992,6 +1051,73 @@ function drawAiOverlay(ctx, detections, offsetX, offsetY) {
     ctx.fillStyle = '#FF0000';
     ctx.font = '14px sans-serif';
     ctx.fillText(d.className + ' ' + (d.confidence * 100).toFixed(0) + '%', x + offsetX, y + offsetY - 4);
+  });
+}
+
+/**
+ * Menandai LANGSUNG di gambar area yang menyebabkan NG - meniru cara kerja
+ * Keyence IV Series/VS Series, yang menampilkan tanda/kotak merah persis di
+ * lokasi kegagalan pada foto hasil inspeksi (bukan cuma daftar teks "NG:
+ * ..."), supaya operator langsung tahu "yang mana" bagian part yang
+ * bermasalah tanpa harus menerka-nerka atau membandingkan manual dengan
+ * part contoh.
+ *
+ * - AIDetection: kotak presisi di lokasi objek/defect terdeteksi (sudah
+ *   digambar langsung saat pemrosesan lewat drawAiOverlay - lihat
+ *   runInspectionCycle).
+ * - Blob: kotak presisi mengelilingi kontur defect terbesar yang terdeteksi
+ *   (dari VisionTools.blobDefectArea -> bboxPx).
+ * - EdgeDimension: garis di kedua tepi yang diukur (edgeMinPx/edgeMaxPx).
+ * - Tool lain (PatternMatch, Presence, Color, Counting, AIClassification,
+ *   QR/Barcode/OCR): belum ada koordinat defect yang presisi dari
+ *   algoritmanya, jadi ditandai dengan kotak putus-putus mengelilingi
+ *   seluruh ROI tool tsb + label alasannya, supaya operator tetap tahu ROI
+ *   mana yang gagal walau titik presisinya belum bisa ditunjukkan.
+ */
+function drawNgOverlayForResults(toolResults) {
+  if (!toolResults || !toolResults.length) return;
+  const overlay = document.getElementById('runOverlay');
+  if (!overlay) return;
+  const ctx = overlay.getContext('2d');
+
+  toolResults.forEach(function (tr) {
+    if (tr.passFail !== false) return; // hanya tandai tool yang NG
+    const vis = lastToolVisualData[tr.toolId];
+    if (!vis) return;
+
+    ctx.strokeStyle = '#FF0000';
+    ctx.fillStyle = '#FF0000';
+    ctx.font = 'bold 14px sans-serif';
+
+    if (vis.type === 'Blob' && vis.bboxPx) {
+      ctx.lineWidth = 3;
+      ctx.strokeRect(vis.roiOffsetX + vis.bboxPx.x, vis.roiOffsetY + vis.bboxPx.y, vis.bboxPx.w, vis.bboxPx.h);
+      ctx.fillText('DEFECT', vis.roiOffsetX + vis.bboxPx.x, vis.roiOffsetY + vis.bboxPx.y - 6);
+    } else if (vis.type === 'EdgeDimension' && vis.edgeMinPx != null && vis.edgeMaxPx != null) {
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      if (vis.axis === 'y') {
+        ctx.moveTo(vis.roiOffsetX, vis.roiOffsetY + vis.edgeMinPx);
+        ctx.lineTo(vis.roiOffsetX + vis.roiWidth, vis.roiOffsetY + vis.edgeMinPx);
+        ctx.moveTo(vis.roiOffsetX, vis.roiOffsetY + vis.edgeMaxPx);
+        ctx.lineTo(vis.roiOffsetX + vis.roiWidth, vis.roiOffsetY + vis.edgeMaxPx);
+      } else {
+        ctx.moveTo(vis.roiOffsetX + vis.edgeMinPx, vis.roiOffsetY);
+        ctx.lineTo(vis.roiOffsetX + vis.edgeMinPx, vis.roiOffsetY + vis.roiHeight);
+        ctx.moveTo(vis.roiOffsetX + vis.edgeMaxPx, vis.roiOffsetY);
+        ctx.lineTo(vis.roiOffsetX + vis.edgeMaxPx, vis.roiOffsetY + vis.roiHeight);
+      }
+      ctx.stroke();
+      ctx.fillText('OUT OF TOLERANCE', vis.roiOffsetX, vis.roiOffsetY - 6);
+    } else {
+      // Fallback: kotak putus-putus mengelilingi ROI tool ini + label alasan.
+      ctx.save();
+      ctx.setLineDash([6, 4]);
+      ctx.lineWidth = 2;
+      ctx.strokeRect(vis.roiOffsetX, vis.roiOffsetY, vis.roiWidth, vis.roiHeight);
+      ctx.restore();
+      ctx.fillText('NG: ' + toolTypeLabel(vis.type), vis.roiOffsetX, Math.max(12, vis.roiOffsetY - 6));
+    }
   });
 }
 
@@ -1020,6 +1146,7 @@ function updateRunModeUi(res) {
   }).join('<br>');
 
   updateJudgeValueBars(res.toolResults);
+  drawNgOverlayForResults(res.toolResults);
 }
 
 /**
