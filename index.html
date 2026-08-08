@@ -554,11 +554,8 @@
               <input type="radio" class="btn-check" name="runTriggerMode" id="triggerExternal" value="external" checked>
               <label class="btn btn-outline-primary btn-sm" for="triggerExternal">External (IO)</label>
             </div>
-            <div id="internalTriggerControls" class="d-none mb-3">
-              <label class="form-label small">Interval Capture Otomatis (ms)</label>
-              <input type="number" id="internalTriggerInterval" class="form-control form-control-sm" value="1000" min="100" step="100">
-            </div>
-            <p id="externalTriggerHint" class="small text-muted mb-3">Menunggu sinyal trigger dari Arduino/ESP8266/PLC (via status IO). Pastikan perangkat sudah tersambung di menu "Arduino / ESP8266 IO".</p>
+            <p id="internalTriggerHint" class="d-none small text-muted mb-3">Mode manual - TIDAK ada capture otomatis berulang. Klik tombol "Measure (Trigger 1x)" di bawah setiap kali ingin mengukur 1 part.</p>
+            <p id="externalTriggerHint" class="small text-muted mb-3">Menunggu sinyal trigger dari Arduino/ESP8266/PLC (via status IO) - setiap 1 sinyal = 1 kali pengukuran. Pastikan perangkat sudah tersambung di menu "Arduino / ESP8266 IO".</p>
 
             <label class="form-label small">Resolusi Kamera Run Mode</label>
             <select id="runResolutionSelect" class="form-select form-select-sm mb-2">

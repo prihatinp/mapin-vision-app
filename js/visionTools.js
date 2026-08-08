@@ -455,7 +455,6 @@ const AIInference = {
 let runOkCount = 0, runNgCount = 0;
 let runStream = null;
 let pollIntervalId = null; // trigger EXTERNAL (polling status IO)
-let internalTriggerIntervalId = null; // trigger INTERNAL (timer capture otomatis)
 let runStaticTestImage = null; // canvas gambar test yang diupload dari device (dipakai sbg pengganti frame kamera)
 let lastToolVisualData = {}; // toolId -> info posisi (offset ROI, bbox defect, dsb.) siklus inspeksi terakhir, dipakai untuk menandai lokasi penyebab NG pada gambar (lihat drawNgOverlayForResults)
 
@@ -670,56 +669,62 @@ function toggleRunCamera() {
 }
 
 /* ==================================================================
-   MODE TRIGGER: INTERNAL (timer otomatis, seperti Continuous Monitoring)
-   vs EXTERNAL (menunggu sinyal dari Arduino/ESP8266/PLC lewat status IO -
-   perilaku asli sebelum fitur ini ditambahkan).
+   MODE TRIGGER - HANYA 2 MODE, KEDUANYA "1 KALI UKUR PER TRIGGER"
+   (BUKAN capture berulang otomatis tanpa henti):
+     1. Internal = operator klik tombol "Measure (Trigger 1x)" -> ukur 1x.
+        Tidak ada timer/interval otomatis sama sekali.
+     2. External (IO) = menunggu 1 sinyal trigger dari Arduino/ESP8266/PLC
+        -> ukur 1x per sinyal, lalu menunggu sinyal berikutnya (bukan
+        mengukur berulang-ulang selama sinyal itu masih menyala).
    ================================================================== */
 let runTriggerMode = 'external';
+let externalIoWasBusy = false; // untuk deteksi 1x "tepi naik" sinyal, supaya 1 sinyal tidak memicu banyak kali pengukuran
 
 function initTriggerModeControls() {
   document.querySelectorAll('input[name="runTriggerMode"]').forEach(function (radio) {
     radio.onchange = function () {
       runTriggerMode = radio.value;
-      document.getElementById('internalTriggerControls').classList.toggle('d-none', runTriggerMode !== 'internal');
+      document.getElementById('internalTriggerHint').classList.toggle('d-none', runTriggerMode !== 'internal');
       document.getElementById('externalTriggerHint').classList.toggle('d-none', runTriggerMode !== 'external');
       startSelectedTriggerLoop();
     };
   });
-  const intervalInput = document.getElementById('internalTriggerInterval');
-  if (intervalInput) intervalInput.onchange = function () { if (runTriggerMode === 'internal') startSelectedTriggerLoop(); };
 }
 
 function startSelectedTriggerLoop() {
   stopTriggerLoops();
-  if (runTriggerMode === 'internal') startInternalTriggerLoop();
-  else startExternalTriggerLoop();
+  // Mode Internal TIDAK punya loop sama sekali - pengukuran hanya terjadi
+  // saat operator klik tombol "Measure (Trigger 1x)" (lihat initRunMode()).
+  if (runTriggerMode === 'external') startExternalTriggerLoop();
 }
 
 function stopTriggerLoops() {
   if (pollIntervalId) { clearInterval(pollIntervalId); pollIntervalId = null; }
-  if (internalTriggerIntervalId) { clearInterval(internalTriggerIntervalId); internalTriggerIntervalId = null; }
+  externalIoWasBusy = false;
 }
 
-/** Trigger EXTERNAL - menunggu sinyal Arduino/ESP8266/PLC (status IO = BUSY). */
+/**
+ * Trigger EXTERNAL - menunggu sinyal Arduino/ESP8266/PLC (status IO =
+ * BUSY), lalu ukur TEPAT 1 KALI per sinyal. SEBELUMNYA kode ini memicu
+ * runInspectionCycle() di SETIAP siklus polling (tiap 300ms) selama
+ * status IO masih terbaca BUSY, sehingga 1 sinyal fisik yang tertahan
+ * beberapa ratus milidetik bisa memicu pengukuran berkali-kali tanpa
+ * disadari. Sekarang dipakai deteksi "tepi naik" (edge detection):
+ * pengukuran hanya dipicu saat status BERUBAH dari tidak-BUSY menjadi
+ * BUSY, dan tidak akan trigger lagi sampai status kembali tidak-BUSY dulu.
+ */
 function startExternalTriggerLoop() {
+  externalIoWasBusy = false;
   pollIntervalId = setInterval(function () {
     if (!runPollingActive) return;
     callApi('apiGetIoStatusForUi', [CURRENT_SESSION]).then(function (status) {
-      if (status.status === 'BUSY') {
-        runInspectionCycle();
+      const isBusy = status.status === 'BUSY';
+      if (isBusy && !externalIoWasBusy) {
+        runInspectionCycle(); // tepi naik sinyal -> ukur 1x
       }
+      externalIoWasBusy = isBusy;
     }).catch(function () { /* biarkan polling berikutnya coba lagi */ });
   }, 300); // simulasi WebSocket via polling ringan
-}
-
-/** Trigger INTERNAL - capture & inspeksi otomatis tiap interval yang diset operator. */
-function startInternalTriggerLoop() {
-  const intervalInput = document.getElementById('internalTriggerInterval');
-  const intervalMs = Math.max(100, parseInt((intervalInput && intervalInput.value) || 1000, 10));
-  internalTriggerIntervalId = setInterval(function () {
-    if (!runPollingActive) return;
-    runInspectionCycle();
-  }, intervalMs);
 }
 
 /**
