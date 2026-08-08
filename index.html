@@ -2,6 +2,17 @@
 <html lang="id">
 <head>
 <meta charset="UTF-8">
+<!-- PENTING untuk tampilan HP: tanpa tag ini, browser HP akan merender
+     halaman seolah di layar desktop (lebar ~980px) lalu mengecilkannya
+     supaya muat di layar - akibatnya semua @media (max-width:900px) di
+     style.css TIDAK PERNAH aktif, dan pinch-zoom/double-tap zoom cuma
+     memperbesar tampilan yang sudah kacau itu tanpa menata ulang
+     layout-nya (makanya gambar/kotak terlihat "tidak ikut berubah" saat
+     di-zoom - sebenarnya bukan gambarnya yang diam, tapi seluruh halaman
+     memang tidak pernah menyesuaikan lebar layar HP sejak awal). Dengan
+     width=device-width, halaman dirender pas selebar layar device sejak
+     awal, sehingga CSS responsive yang sudah dibuat benar-benar aktif. -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MAP-IN Vision V1.0</title>
 <base target="_top">
 <link rel="preconnect" href="https://fonts.googleapis.com">
