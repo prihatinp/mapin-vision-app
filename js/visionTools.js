@@ -583,7 +583,7 @@ function initRunMode() {
     runPollingActive = !runPollingActive;
     this.innerText = runPollingActive ? 'Pause Trigger' : 'Resume Trigger';
   };
-  document.getElementById('btnRecapture').onclick = runInspectionCycle;
+  document.getElementById('btnRecapture').onclick = function () { runInspectionCycle(true); };
 
   initRunUploadImageControls();
   initTriggerModeControls();
@@ -932,7 +932,20 @@ function updateJudgeValueBars(toolResults) {
   });
 }
 
-async function runInspectionCycle() {
+/**
+ * @param {boolean} [isManualTrigger] - true HANYA kalau dipanggil langsung
+ *   dari klik tombol "Measure (Trigger 1x)" (aksi user, sekali jalan).
+ *   PENTING: nilai ini WAJIB false/kosong untuk semua pemanggilan dari
+ *   loop otomatis (startInternalTriggerLoop/startExternalTriggerLoop),
+ *   karena fungsi ini dipanggil BERULANG lewat setInterval - kalau guard
+ *   di bawah pakai alert() tanpa syarat ini, begitu kamera mati/belum ada
+ *   gambar test, alert() akan muncul TERUS-MENERUS setiap tick interval
+ *   (blocking dialog di browser), sampai tab harus dipaksa ditutup. Ini
+ *   BUG NYATA yang pernah terjadi - makanya sekarang loop otomatis hanya
+ *   mencatat ke console (senyap), sedangkan klik manual tetap dapat
+ *   feedback jelas tapi lewat teks status (non-blocking), BUKAN alert().
+ */
+async function runInspectionCycle(isManualTrigger) {
   if (!ACTIVE_RECIPE) return;
 
   // Pastikan opencv.js sudah selesai dimuat sebelum dipakai (lihat catatan di
@@ -955,7 +968,13 @@ async function runInspectionCycle() {
   } else {
     const video = document.getElementById('runVideo');
     if (!video.videoWidth) {
-      alert('Kamera belum menyala dan belum ada gambar test yang diupload. Klik "Nyalakan Kamera (Live)" atau "Upload Gambar Test" dulu.');
+      const msg = 'Kamera belum menyala dan belum ada gambar test yang diupload. Klik "Nyalakan Kamera (Live)" atau "Upload Gambar Test" dulu.';
+      if (isManualTrigger) {
+        const statusEl = document.getElementById('runUploadImageStatus');
+        if (statusEl) statusEl.innerHTML = '<span class="text-danger">' + msg + '</span>';
+      } else {
+        console.warn('Siklus trigger otomatis dilewati:', msg); // loop otomatis - JANGAN alert(), cukup senyap di console
+      }
       return;
     }
     fullCanvas = document.createElement('canvas');
