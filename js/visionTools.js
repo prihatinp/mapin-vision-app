@@ -574,8 +574,7 @@ function startRunCamera() {
  * menguji recipe dengan foto yang sudah ada (dari laptop/HP) tanpa perlu
  * kamera live menyala. Gambar yang diupload TIDAK otomatis diukur -
  * operator harus klik "Measure (Trigger 1x)" supaya jelas kapan siklus
- * pengukuran benar-benar terjadi (sesuai permintaan: gambar tampil dulu,
- * baru diukur saat tombol trigger diklik).
+ * pengukuran benar-benar terjadi.
  */
 function initRunUploadImageControls() {
   const btn = document.getElementById('btnRunUploadImage');
@@ -705,13 +704,11 @@ function stopTriggerLoops() {
 
 /**
  * Trigger EXTERNAL - menunggu sinyal Arduino/ESP8266/PLC (status IO =
- * BUSY), lalu ukur TEPAT 1 KALI per sinyal. SEBELUMNYA kode ini memicu
- * runInspectionCycle() di SETIAP siklus polling (tiap 300ms) selama
- * status IO masih terbaca BUSY, sehingga 1 sinyal fisik yang tertahan
- * beberapa ratus milidetik bisa memicu pengukuran berkali-kali tanpa
- * disadari. Sekarang dipakai deteksi "tepi naik" (edge detection):
- * pengukuran hanya dipicu saat status BERUBAH dari tidak-BUSY menjadi
- * BUSY, dan tidak akan trigger lagi sampai status kembali tidak-BUSY dulu.
+ * BUSY), lalu ukur TEPAT 1 KALI per sinyal. Dipakai deteksi "tepi naik"
+ * (edge detection): pengukuran hanya dipicu saat status BERUBAH dari
+ * tidak-BUSY menjadi BUSY, dan tidak akan trigger lagi sampai status
+ * kembali tidak-BUSY dulu - supaya 1 sinyal fisik yang tertahan beberapa
+ * ratus milidetik tidak memicu pengukuran berkali-kali.
  */
 function startExternalTriggerLoop() {
   externalIoWasBusy = false;
@@ -786,7 +783,7 @@ function initJudgeAdjustPanel() {
   }
 }
 
-/** Daftar field parameter utama yang bisa di-adjust per tipe tool (input id -> params key). */
+/** Daftar field parameter utama yang bisa di-adjust per tipe tool (input id -> params key), lengkap dengan rentang min/max untuk slider. */
 function _judgeAdjustFieldsForType(type) {
   switch (type) {
     case 'PatternMatch': return [{ key: 'threshold', label: 'Threshold Similarity (0-1)', step: 0.01, min: 0, max: 1 }];
@@ -902,13 +899,11 @@ async function runInspectionCycle(isManualTrigger) {
   const startMs = performance.now();
 
   // Sumber gambar: gambar test yang diupload dari device (kalau ada), atau
-  // frame kamera live. SEBELUMNYA kode ini langsung ambil dari <video> tanpa
-  // cek apakah kamera benar-benar menyala, dan kalau belum ready akan
-  // memicu alert() berulang-ulang saat dipanggil dari trigger otomatis
-  // (setInterval) sehingga halaman terasa "nge-hang"/crash. Sekarang siklus
-  // otomatis dilewati secara diam-diam (console.warn saja) kalau memang
-  // belum ada sumber gambar, sementara klik manual "Measure" menampilkan
-  // pesan status yang jelas (bukan alert() yang memblokir).
+  // frame kamera live. Kalau belum ada sumber gambar sama sekali, siklus
+  // otomatis (bukan klik manual) dilewati diam-diam (console.warn saja)
+  // supaya TIDAK memicu alert() berulang-ulang dari trigger otomatis
+  // (yang sebelumnya bikin halaman terasa "nge-hang"); klik manual
+  // "Measure" menampilkan pesan status yang jelas sebagai gantinya.
   let fullCanvas;
   if (runStaticTestImage) {
     fullCanvas = runStaticTestImage;
@@ -930,12 +925,11 @@ async function runInspectionCycle(isManualTrigger) {
     fullCanvas.getContext('2d').drawImage(video, 0, 0);
   }
 
-  // Indikator "sedang mengukur" - SEBELUMNYA badge diam saja dari klik
-  // Measure sampai hasil OK/NG keluar, jadi operator tidak tahu apakah
-  // prosesnya jalan atau macet. Sekarang badge langsung berubah jadi
-  // "MENGUKUR..." (dengan animasi berdenyut, lihat .measuring di
-  // style.css) dan tombol Measure di-nonaktifkan sementara, supaya jelas
-  // ada proses berjalan, sampai hasil OK/NG tampil atau terjadi error.
+  // Indikator "sedang mengukur" - badge langsung berubah jadi "MENGUKUR..."
+  // (dengan animasi berdenyut, lihat .measuring di style.css) dan tombol
+  // Measure di-nonaktifkan sementara, supaya jelas ada proses berjalan,
+  // sampai hasil OK/NG tampil atau terjadi error - operator tidak perlu
+  // menebak-nebak apakah prosesnya jalan atau macet.
   const badgeEl = document.getElementById('runDecisionBadge');
   badgeEl.innerText = 'MENGUKUR...';
   badgeEl.className = 'run-decision-badge measuring';
@@ -952,7 +946,7 @@ async function runInspectionCycle(isManualTrigger) {
   // di siklus ini, supaya SETELAH server mengembalikan keputusan OK/NG per
   // tool, kita bisa menggambar tanda visual TEPAT di lokasi penyebab NG-nya
   // pada gambar - meniru cara kerja Keyence IV/VS Series yang menandai
-  // langsung area penyebab NG pada foto hasil (bukan cuma angka di tabel).
+  // langsung area penyebab NG pada foto hasil.
   lastToolVisualData = {};
 
   const toolResults = [];
@@ -1020,10 +1014,9 @@ async function runInspectionCycle(isManualTrigger) {
     toolResults: toolResults,
     clientProcessingMs: clientProcessingMs,
     // Kirim parameter tool yang mungkin sudah di-geser di panel "Adjusting
-    // Judge OK/NG" - SEBELUMNYA server selalu ambil ulang recipe murni dari
-    // Spreadsheet, jadi geseran slider di sini cuma kosmetik dan tidak
-    // pernah benar-benar mempengaruhi hasil OK/NG. toolsOverride membuat
-    // "Terapkan (Live)" sungguhan berlaku untuk siklus berikutnya.
+    // Judge OK/NG" - server akan pakai ini (bukan recipe murni dari
+    // Spreadsheet) supaya "Terapkan (Live)" sungguhan berlaku untuk
+    // siklus ini, bukan cuma kosmetik di browser.
     toolsOverride: ACTIVE_RECIPE.tools
   }, CURRENT_SESSION]).then(function (res) {
     if (btnMeasureEl) btnMeasureEl.disabled = false;
@@ -1068,16 +1061,11 @@ function drawAiOverlay(ctx, detections, offsetX, offsetY) {
  * part contoh.
  *
  * - AIDetection: kotak presisi di lokasi objek/defect terdeteksi (sudah
- *   digambar langsung saat pemrosesan lewat drawAiOverlay - lihat
- *   runInspectionCycle).
- * - Blob: kotak presisi mengelilingi kontur defect terbesar yang terdeteksi
- *   (dari VisionTools.blobDefectArea -> bboxPx).
+ *   digambar langsung saat pemrosesan lewat drawAiOverlay).
+ * - Blob: kotak presisi mengelilingi kontur defect terbesar (bboxPx).
  * - EdgeDimension: garis di kedua tepi yang diukur (edgeMinPx/edgeMaxPx).
- * - Tool lain (PatternMatch, Presence, Color, Counting, AIClassification,
- *   QR/Barcode/OCR): belum ada koordinat defect yang presisi dari
- *   algoritmanya, jadi ditandai dengan kotak putus-putus mengelilingi
- *   seluruh ROI tool tsb + label alasannya, supaya operator tetap tahu ROI
- *   mana yang gagal walau titik presisinya belum bisa ditunjukkan.
+ * - Tool lain: belum ada koordinat defect presisi, jadi ditandai kotak
+ *   putus-putus mengelilingi seluruh ROI tool tsb + label alasannya.
  */
 function drawNgOverlayForResults(toolResults) {
   if (!toolResults || !toolResults.length) return;
@@ -1129,10 +1117,9 @@ function drawNgOverlayForResults(toolResults) {
 function updateRunModeUi(res) {
   const badge = document.getElementById('runDecisionBadge');
   // Ditampilkan dalam detik (bukan ms mentah yang desimalnya panjang, mis.
-  // "815.4000000953674 ms" - itu wajar terjadi karena cycleTimeMs dihitung
-  // dari performance.now() yang presisinya sub-milidetik, tapi tidak enak
-  // dibaca operator). toFixed(1) -> 1 angka di belakang koma sudah cukup
-  // presisi untuk satuan detik di konteks inspeksi.
+  // "815.4000000953674 ms" - itu wajar karena cycleTimeMs dihitung dari
+  // performance.now() yang presisinya sub-milidetik) - toFixed(1) supaya
+  // enak dibaca operator.
   const cycleTimeSec = ((res.cycleTimeMs || 0) / 1000).toFixed(1);
   badge.innerText = res.decision + ' (' + cycleTimeSec + ' s)';
   badge.className = 'run-decision-badge ' + (res.decision === 'OK' ? 'ok' : 'ng');
@@ -1158,7 +1145,7 @@ function updateRunModeUi(res) {
  * Isi bar "Adjusting Judge OK/NG" dengan nilai hasil pengukuran yang baru
  * saja diperoleh - posisi bar (%) dihitung dari rentang min/max slider
  * yang bersangkutan, warnanya hijau kalau tool ini PASS dan merah kalau
- * FAIL (bukan cuma keputusan akhir OK/NG recipe, tapi per-tool).
+ * FAIL (per-tool, bukan cuma keputusan akhir OK/NG recipe).
  */
 function updateJudgeValueBars(toolResults) {
   if (!toolResults || !toolResults.length) return;

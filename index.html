@@ -7,11 +7,8 @@
      supaya muat di layar - akibatnya semua @media (max-width:900px) di
      style.css TIDAK PERNAH aktif, dan pinch-zoom/double-tap zoom cuma
      memperbesar tampilan yang sudah kacau itu tanpa menata ulang
-     layout-nya (makanya gambar/kotak terlihat "tidak ikut berubah" saat
-     di-zoom - sebenarnya bukan gambarnya yang diam, tapi seluruh halaman
-     memang tidak pernah menyesuaikan lebar layar HP sejak awal). Dengan
-     width=device-width, halaman dirender pas selebar layar device sejak
-     awal, sehingga CSS responsive yang sudah dibuat benar-benar aktif. -->
+     layout-nya. Dengan width=device-width, halaman dirender pas selebar
+     layar device sejak awal, sehingga CSS responsive benar-benar aktif. -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MAP-IN Vision V1.0</title>
 <base target="_top">
@@ -35,6 +32,9 @@
       <div class="login-logo-box">
         <img src="img/logo-mapin-vision.png" alt="MAP-IN Vision - Musashi Indonesia" class="login-logo-img">
       </div>
+      <h2 class="brand-title">MAP-IN <span class="text-accent">VISION</span></h2>
+      <p class="brand-tagline">Intelligent Eyes for Manufacturing</p>
+      <p class="text-muted small">Musashi Indonesia</p>
     </div>
     <form id="loginForm">
       <div class="mb-3">
@@ -52,8 +52,6 @@
 </div>
 
 <div id="appShell" class="app-shell d-none">
-
-  <!-- Backdrop untuk sidebar mobile (klik di luar sidebar = tutup menu) -->
   <div id="sidebarBackdrop" class="sidebar-backdrop"></div>
 
   <!-- SIDEBAR -->
@@ -164,6 +162,7 @@
                 <div id="lastResultMeta" class="small d-none">
                   <img id="lastResultImg" class="dash-last-img d-none" alt="Foto hasil inspeksi terakhir">
                   <div id="lastResultImgLoading" class="text-center text-muted small py-3 d-none">Memuat foto...</div>
+                  <div id="lastResultImgTempNote" class="small text-muted d-none mb-2"><span class="material-icons align-middle" style="font-size:14px;">schedule</span> Foto sementara (belum disimpan permanen ke Drive) - tersedia beberapa jam saja.</div>
                   <div class="dash-kv"><span>Recipe</span><b id="lastResultRecipe">-</b></div>
                   <div class="dash-kv"><span>Waktu</span><b id="lastResultTime">-</b></div>
                   <div class="dash-kv"><span>Cycle Time</span><b id="lastResultCycle">-</b></div>

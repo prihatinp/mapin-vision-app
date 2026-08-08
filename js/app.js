@@ -129,9 +129,6 @@ function showView(viewName) {
   if (_currentViewName === 'dashboard' && viewName !== 'dashboard') {
     stopDashboardPolling();
   }
-  if (_currentViewName === 'ioMonitor' && viewName !== 'ioMonitor') {
-    stopIoStatusPolling();
-  }
   _currentViewName = viewName;
 
   document.querySelectorAll('.view').forEach(function (v) { v.classList.add('d-none'); });
@@ -149,7 +146,7 @@ function showView(viewName) {
   if (viewName === 'roiEditor') initRoiEditor();
   if (viewName === 'run') initRunMode();
   if (viewName === 'history') loadHistory();
-  if (viewName === 'ioMonitor') startIoStatusPolling();
+  if (viewName === 'ioMonitor') refreshIoStatus();
   if (viewName === 'aiCenter') loadAiModelList();
   if (viewName === 'settings') loadBackupHistory();
 }
@@ -167,7 +164,7 @@ function loadDashboard() {
     document.getElementById('statOk').innerText = res.okCount;
     document.getElementById('statNg').innerText = res.ngCount;
     document.getElementById('statYield').innerText = res.yieldPct + '%';
-    document.getElementById('statCycleTime').innerText = res.avgCycleTimeMs ? (res.avgCycleTimeMs / 1000).toFixed(1) + 's' : '-';
+    document.getElementById('statCycleTime').innerText = res.avgCycleTimeMs ? (res.avgCycleTimeMs / 1000).toFixed(1) + ' s' : '-';
     document.getElementById('statUph').innerText = res.avgCycleTimeMs ? Math.round(3600000 / res.avgCycleTimeMs) : '-';
 
     // Delta dibandingkan dengan hari sebelumnya, dihitung dari 2 entri terakhir
@@ -321,7 +318,7 @@ function _renderDashLastResult(last) {
   badge.style.color = last.decision === 'OK' ? '#37e28c' : '#ff6b6b';
   document.getElementById('lastResultRecipe').innerText = last.recipeName || '-';
   document.getElementById('lastResultTime').innerText = last.timestamp ? new Date(last.timestamp).toLocaleString('id-ID') : '-';
-  document.getElementById('lastResultCycle').innerText = last.cycleTimeMs ? (last.cycleTimeMs / 1000).toFixed(1) + 's' : '-';
+  document.getElementById('lastResultCycle').innerText = last.cycleTimeMs ? (last.cycleTimeMs / 1000).toFixed(1) + ' s' : '-';
   document.getElementById('lastResultNgReason').innerText = last.ngReasonType || '-';
   const imgLink = document.getElementById('lastResultImgLink');
   if (last.imagePath) {
@@ -332,22 +329,23 @@ function _renderDashLastResult(last) {
   }
 
   // Foto berganti mengikuti hasil cycle inspeksi terbaru (bukan live stream
-  // kamera), otomatis ter-refresh tiap kali loadDashboard() dipanggil ulang
-  // lewat polling di bawah. Ada 2 sumber foto:
-  //  1. imageFileId terisi -> foto tersimpan PERMANEN di Drive (mis. NG,
-  //     atau recipe dengan policy OK_AND_NG) -> apiGetDriveImageBase64.
-  //  2. imageFileId kosong TAPI decision OK & recordId ada -> foto TIDAK
-  //     disimpan ke Drive (hemat storage - policy default NG_ONLY), tapi
-  //     masih ada di cache sementara Apps Script (berlaku ~6 jam) ->
-  //     apiGetTempInspectionImage. Kalau sudah kadaluarsa, tampilkan pesan
-  //     placeholder alih-alih foto kosong membingungkan.
+  // kamera - ini snapshot hasil inspeksi yang benar-benar tersimpan), otomatis
+  // ter-refresh tiap kali loadDashboard() dipanggil ulang lewat polling di
+  // bawah. Dua sumber foto mungkin: (1) file permanen di Drive (imageFileId,
+  // biasanya untuk hasil NG sesuai policy default NG_ONLY), atau (2) foto
+  // SEMENTARA di CacheService (recordId, untuk hasil OK yang sengaja TIDAK
+  // disimpan ke Drive supaya tidak bikin Drive penuh - lihat
+  // InspectionService._cacheTempImage) - tetap bisa tampil di Dashboard
+  // selama beberapa jam walau tidak permanen.
   const img = document.getElementById('lastResultImg');
   const loading = document.getElementById('lastResultImgLoading');
-  const dashKey = last.imageFileId ? ('drive:' + last.imageFileId) : (last.recordId ? ('temp:' + last.recordId) : null);
+  const tempNote = document.getElementById('lastResultImgTempNote');
 
+  const dashKey = last.imageFileId ? ('drive:' + last.imageFileId) : (last.recordId ? ('temp:' + last.recordId) : null);
   if (!dashKey) {
     img.classList.add('d-none');
     loading.classList.add('d-none');
+    if (tempNote) tempNote.classList.add('d-none');
     _lastDashImageFileId = null;
     return;
   }
@@ -355,27 +353,29 @@ function _renderDashLastResult(last) {
 
   _lastDashImageFileId = dashKey;
   img.classList.add('d-none');
+  if (tempNote) tempNote.classList.add('d-none');
   loading.classList.remove('d-none');
-  loading.innerText = 'Memuat foto...';
 
-  const fetchCall = last.imageFileId
-    ? callApi('apiGetDriveImageBase64', [last.imageFileId, CURRENT_SESSION])
-    : callApi('apiGetTempInspectionImage', [last.recordId, CURRENT_SESSION]);
-
-  fetchCall.then(function (res) {
-    if (res.success) {
+  if (last.imageFileId) {
+    callApi('apiGetDriveImageBase64', [last.imageFileId, CURRENT_SESSION]).then(function (res) {
       loading.classList.add('d-none');
-      img.src = res.dataUri;
-      img.classList.remove('d-none');
-    } else if (!last.imageFileId) {
-      // Foto sementara (bukan Drive) sudah kadaluarsa/tidak ter-cache -
-      // ini normal untuk hasil OK lama, bukan error, jadi pesannya netral.
-      loading.classList.remove('d-none');
-      loading.innerText = 'Foto tidak disimpan permanen untuk hasil OK ini (hemat storage), dan cache sementaranya sudah kadaluarsa.';
-    } else {
+      if (res.success) {
+        img.src = res.dataUri;
+        img.classList.remove('d-none');
+      }
+    }).catch(function () { loading.classList.add('d-none'); });
+  } else {
+    callApi('apiGetTempInspectionImage', [last.recordId, CURRENT_SESSION]).then(function (res) {
       loading.classList.add('d-none');
-    }
-  }).catch(function () { loading.classList.add('d-none'); });
+      if (res.success) {
+        img.src = res.imageBase64;
+        img.classList.remove('d-none');
+        if (tempNote) tempNote.classList.remove('d-none'); // beri tahu operator ini foto sementara, bukan file permanen
+      }
+      // Kalau gagal (mis. sudah lewat 6 jam masa berlaku cache) - biarkan
+      // saja tidak ada foto, tidak fatal, ini fitur pelengkap.
+    }).catch(function () { loading.classList.add('d-none'); });
+  }
 }
 
 /* Auto-refresh Dashboard tiap beberapa detik supaya kartu "Hasil Inspeksi
@@ -491,7 +491,7 @@ function loadHistory() {
         '<td>' + (r.operator || '-') + '</td>' +
         '<td><span class="badge ' + (r.decision === 'OK' ? 'bg-success' : 'bg-danger') + '">' + r.decision + '</span></td>' +
         '<td class="small text-danger">' + (r.ngReason || '') + '</td>' +
-        '<td>' + (r.cycleTimeMs ? (r.cycleTimeMs / 1000).toFixed(1) + ' s' : '-') + '</td>' +
+        '<td>' + (r.cycleTimeMs ? (Number(r.cycleTimeMs) / 1000).toFixed(1) + ' s' : '-') + '</td>' +
         '<td>' + (r.imagePath ? '<a href="' + r.imagePath + '" target="_blank">Lihat</a>' : '-') + '</td>';
       tbody.appendChild(tr);
     });
@@ -511,7 +511,7 @@ const IO_PIN_MAPS = {
   arduino: [
     { key: 'TRIGGER', label: 'D2 - Trigger IN', dir: 'in' },
     { key: 'OK', label: 'D5 - OK OUT', dir: 'out' },
-    { key: 'NG', label: 'D6 - NG OUT', dir: 'out' },
+    { key: 'NG', label: 'D13 - NG OUT (+ LED bawaan board)', dir: 'out' },
     { key: 'BUSY', label: 'D7 - BUSY OUT', dir: 'out' },
     { key: 'ERROR', label: 'D8 - ERROR OUT', dir: 'out' }
   ],
@@ -598,26 +598,6 @@ function renderIoSimGrid() {
       });
     };
   }
-}
-
-let ioStatusPollId = null;
-
-/**
- * Status ESP8266/Arduino di halaman ini dulunya cuma diambil SEKALI saat
- * halaman dibuka (tidak update lagi setelahnya) - padahal halaman ini
- * justru dipakai untuk MENGUJI/DEBUG koneksi perangkat secara langsung
- * (mis. menekan tombol trigger fisik lalu melihat status berubah ke BUSY).
- * Sekarang di-polling tiap 1 detik selama operator berada di halaman ini,
- * dan otomatis berhenti saat pindah menu (lihat showView()/stopIoStatusPolling()).
- */
-function startIoStatusPolling() {
-  refreshIoStatus();
-  stopIoStatusPolling();
-  ioStatusPollId = setInterval(refreshIoStatus, 1000);
-}
-
-function stopIoStatusPolling() {
-  if (ioStatusPollId) { clearInterval(ioStatusPollId); ioStatusPollId = null; }
 }
 
 function refreshIoStatus() {
