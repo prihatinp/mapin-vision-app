@@ -12,6 +12,7 @@ let ACTIVE_RECIPE = null;
 document.addEventListener('DOMContentLoaded', function () {
   bindLogin();
   bindNav();
+  bindMobileSidebarToggle();
   bindHistory();
   bindIoMonitor();
   bindAiCenter();
@@ -87,22 +88,21 @@ function bindNav() {
       closeMobileSidebar();
     });
   });
-  bindMobileSidebarToggle();
 }
 
-/**
- * Sidebar di layar HP/tablet sempit (<=900px, lihat @media di style.css)
- * disembunyikan sebagai drawer yang muncul dari kiri saat tombol hamburger
- * (#navToggleBtn) di topbar diklik, supaya tampilan tidak "kacau" (menu
- * memenuhi layar) saat dibuka dari browser HP.
- */
+/* Sidebar drawer di layar sempit (mobile) - sidebar disembunyikan di luar
+   layar via CSS (@media max-width:900px) dan hanya dibuka lewat tombol
+   hamburger di topbar, ditutup lagi lewat backdrop gelap atau setelah
+   memilih menu (lihat bindNav di atas). Tidak berpengaruh apa pun di
+   layar desktop (tombolnya disembunyikan lewat CSS). */
 function bindMobileSidebarToggle() {
   const toggleBtn = document.getElementById('navToggleBtn');
   const sidebar = document.getElementById('sidebarNav');
   const backdrop = document.getElementById('sidebarBackdrop');
   if (!toggleBtn || !sidebar || !backdrop) return;
+
   toggleBtn.addEventListener('click', function () {
-    sidebar.classList.toggle('open');
+    sidebar.classList.toggle('show');
     backdrop.classList.toggle('show');
   });
   backdrop.addEventListener('click', closeMobileSidebar);
@@ -111,7 +111,7 @@ function bindMobileSidebarToggle() {
 function closeMobileSidebar() {
   const sidebar = document.getElementById('sidebarNav');
   const backdrop = document.getElementById('sidebarBackdrop');
-  if (sidebar) sidebar.classList.remove('open');
+  if (sidebar) sidebar.classList.remove('show');
   if (backdrop) backdrop.classList.remove('show');
 }
 
@@ -296,9 +296,9 @@ function _renderDashDeltas(dailyTrend) {
   fmt(ids.yield, todayFpy - prevFpy, '%');
 }
 
-// Simpan fileId foto yang gambarnya SEDANG ditampilkan, supaya polling
-// tiap beberapa detik tidak berulang kali minta ulang gambar yang sama
-// ke Drive (baru fetch ulang kalau memang ada hasil baru/fileId berubah).
+// Simpan "kunci" gambar yang SEDANG ditampilkan (beda sumber punya beda kunci -
+// lihat dashKey di bawah), supaya polling tiap beberapa detik tidak berulang
+// kali minta ulang gambar yang sama (baru fetch ulang kalau memang berganti).
 let _lastDashImageFileId = null;
 
 function _renderDashLastResult(last) {
@@ -328,20 +328,18 @@ function _renderDashLastResult(last) {
     imgLink.classList.add('d-none');
   }
 
-  // Foto berganti mengikuti hasil cycle inspeksi terbaru (bukan live stream
-  // kamera - ini snapshot hasil inspeksi yang benar-benar tersimpan), otomatis
-  // ter-refresh tiap kali loadDashboard() dipanggil ulang lewat polling di
-  // bawah. Dua sumber foto mungkin: (1) file permanen di Drive (imageFileId,
-  // biasanya untuk hasil NG sesuai policy default NG_ONLY), atau (2) foto
-  // SEMENTARA di CacheService (recordId, untuk hasil OK yang sengaja TIDAK
-  // disimpan ke Drive supaya tidak bikin Drive penuh - lihat
-  // InspectionService._cacheTempImage) - tetap bisa tampil di Dashboard
-  // selama beberapa jam walau tidak permanen.
+  // Foto berganti mengikuti hasil cycle inspeksi terbaru. Ada 2 sumber:
+  // - Hasil NG (atau OK yang policy-nya disimpan permanen): tersimpan di Drive,
+  //   diambil via apiGetDriveImageBase64(imageFileId).
+  // - Hasil OK yang TIDAK disimpan permanen: hanya ada di cache sementara
+  //   (server, maks 6 jam) supaya Dashboard tetap bisa menampilkan foto
+  //   terakhir tanpa membebani kuota Drive - diambil via
+  //   apiGetTempInspectionImage(recordId).
   const img = document.getElementById('lastResultImg');
   const loading = document.getElementById('lastResultImgLoading');
   const tempNote = document.getElementById('lastResultImgTempNote');
-
   const dashKey = last.imageFileId ? ('drive:' + last.imageFileId) : (last.recordId ? ('temp:' + last.recordId) : null);
+
   if (!dashKey) {
     img.classList.add('d-none');
     loading.classList.add('d-none');
@@ -353,8 +351,8 @@ function _renderDashLastResult(last) {
 
   _lastDashImageFileId = dashKey;
   img.classList.add('d-none');
-  if (tempNote) tempNote.classList.add('d-none');
   loading.classList.remove('d-none');
+  if (tempNote) tempNote.classList.add('d-none');
 
   if (last.imageFileId) {
     callApi('apiGetDriveImageBase64', [last.imageFileId, CURRENT_SESSION]).then(function (res) {
@@ -364,16 +362,14 @@ function _renderDashLastResult(last) {
         img.classList.remove('d-none');
       }
     }).catch(function () { loading.classList.add('d-none'); });
-  } else {
+  } else if (last.recordId) {
     callApi('apiGetTempInspectionImage', [last.recordId, CURRENT_SESSION]).then(function (res) {
       loading.classList.add('d-none');
       if (res.success) {
-        img.src = res.imageBase64;
+        img.src = 'data:image/jpeg;base64,' + res.imageBase64;
         img.classList.remove('d-none');
-        if (tempNote) tempNote.classList.remove('d-none'); // beri tahu operator ini foto sementara, bukan file permanen
+        if (tempNote) tempNote.classList.remove('d-none');
       }
-      // Kalau gagal (mis. sudah lewat 6 jam masa berlaku cache) - biarkan
-      // saja tidak ada foto, tidak fatal, ini fitur pelengkap.
     }).catch(function () { loading.classList.add('d-none'); });
   }
 }
@@ -498,39 +494,36 @@ function loadHistory() {
   }).catch(function (err) { console.warn('Gagal memuat history:', err.message); });
 }
 
-/* ---------------- IO MONITOR / EXTERNAL I/O ---------------- */
+/* ---------------- EXTERNAL I/O (Arduino / ESP8266 / PLC) ---------------- */
 
-/**
- * Pemetaan pin per jenis perangkat, sesuai dokumentasi pin mapping di
- * firmware masing-masing (MAPIN_Arduino_Uno.ino / MAPIN_ESP8266.ino).
- * PLC tidak punya nomor pin baku (tergantung merk/tipe PLC), jadi
- * ditampilkan sebagai placeholder yang harus dipetakan sendiri oleh
- * teknisi PLC di lapangan - lihat penjelasan di panel "PLC (Ethernet)".
- */
+// Pin mapping per jenis perangkat - dipakai untuk merender kartu lampu
+// simulasi di renderIoSimGrid(). Nomor pin Arduino Uno sesuai firmware
+// MAPIN_Arduino_Uno.ino (D2=Trigger, D5=OK, D7=BUSY, D13=NG, D8=Error).
+// ESP8266 & PLC ditampilkan sebagai referensi/placeholder karena wiring
+// fisiknya menyesuaikan board/PLC masing-masing.
 const IO_PIN_MAPS = {
   arduino: [
-    { key: 'TRIGGER', label: 'D2 - Trigger IN', dir: 'in' },
-    { key: 'OK', label: 'D5 - OK OUT', dir: 'out' },
-    { key: 'NG', label: 'D13 - NG OUT (+ LED bawaan board)', dir: 'out' },
-    { key: 'BUSY', label: 'D7 - BUSY OUT', dir: 'out' },
-    { key: 'ERROR', label: 'D8 - ERROR OUT', dir: 'out' }
+    { key: 'TRIGGER', label: 'D2 - Trigger IN', dir: 'in', lampClass: 'io-lamp-trigger' },
+    { key: 'OK', label: 'D5 - OK OUT', dir: 'out', lampClass: 'io-lamp-ok' },
+    { key: 'NG', label: 'D13 - NG OUT (+ LED bawaan board)', dir: 'out', lampClass: 'io-lamp-ng' },
+    { key: 'BUSY', label: 'D7 - BUSY OUT', dir: 'out', lampClass: 'io-lamp-busy' },
+    { key: 'ERROR', label: 'D8 - ERROR OUT', dir: 'out', lampClass: 'io-lamp-error' }
   ],
   esp8266: [
-    { key: 'TRIGGER', label: 'D2 (GPIO4) - Trigger IN', dir: 'in' },
-    { key: 'OK', label: 'D5 (GPIO14) - OK OUT', dir: 'out' },
-    { key: 'NG', label: 'D6 (GPIO12) - NG OUT', dir: 'out' },
-    { key: 'BUSY', label: 'D7 (GPIO13) - BUSY OUT', dir: 'out' },
-    { key: 'ERROR', label: 'D8 (GPIO15) - ERROR OUT', dir: 'out' }
+    { key: 'TRIGGER', label: 'D2 (GPIO4) - Trigger IN', dir: 'in', lampClass: 'io-lamp-trigger' },
+    { key: 'OK', label: 'D5 (GPIO14) - OK OUT', dir: 'out', lampClass: 'io-lamp-ok' },
+    { key: 'NG', label: 'D6 (GPIO12) - NG OUT', dir: 'out', lampClass: 'io-lamp-ng' },
+    { key: 'BUSY', label: 'D7 (GPIO13) - BUSY OUT', dir: 'out', lampClass: 'io-lamp-busy' },
+    { key: 'ERROR', label: 'D8 (GPIO15) - ERROR OUT', dir: 'out', lampClass: 'io-lamp-error' }
   ],
   plc: [
-    { key: 'TRIGGER', label: 'Trigger IN (alamat sesuai PLC, mis. %I0.0/X0)', dir: 'in' },
-    { key: 'OK', label: 'OK OUT (mis. %Q0.0/Y0)', dir: 'out' },
-    { key: 'NG', label: 'NG OUT (mis. %Q0.1/Y1)', dir: 'out' },
-    { key: 'BUSY', label: 'BUSY OUT (mis. %Q0.2/Y2)', dir: 'out' },
-    { key: 'ERROR', label: 'ERROR OUT (mis. %Q0.3/Y3)', dir: 'out' }
+    { key: 'TRIGGER', label: '%I0.0 / X0 - Trigger IN', dir: 'in', lampClass: 'io-lamp-trigger' },
+    { key: 'OK', label: '%Q0.0 / Y0 - OK OUT', dir: 'out', lampClass: 'io-lamp-ok' },
+    { key: 'NG', label: '%Q0.1 / Y1 - NG OUT', dir: 'out', lampClass: 'io-lamp-ng' },
+    { key: 'BUSY', label: '%Q0.2 / Y2 - BUSY OUT', dir: 'out', lampClass: 'io-lamp-busy' },
+    { key: 'ERROR', label: '%Q0.3 / Y3 - ERROR OUT', dir: 'out', lampClass: 'io-lamp-error' }
   ]
 };
-
 let ioSelectedDeviceType = 'arduino';
 let ioLastStatus = 'IDLE';
 
@@ -541,62 +534,65 @@ function bindIoMonitor() {
       callApi('apiManualTestOutput', [signal, CURRENT_SESSION]).then(function (res) {
         if (res && res.success === false) { alert(res.error); return; }
         logSignal(signal);
+        ioLastStatus = signal;
+        renderIoSimGrid();
       });
     });
   });
 
   document.querySelectorAll('input[name="ioDeviceType"]').forEach(function (radio) {
-    radio.onchange = function () {
+    radio.addEventListener('change', function () {
+      if (!radio.checked) return;
       ioSelectedDeviceType = radio.value;
       document.getElementById('ioPanelArduino').classList.toggle('d-none', ioSelectedDeviceType !== 'arduino');
       document.getElementById('ioPanelEsp8266').classList.toggle('d-none', ioSelectedDeviceType !== 'esp8266');
       document.getElementById('ioPanelPlc').classList.toggle('d-none', ioSelectedDeviceType !== 'plc');
       renderIoSimGrid();
-    };
+    });
   });
 
   renderIoSimGrid();
 }
 
-/**
- * Menggambar "lampu" indikator (lingkaran ON/OFF) untuk tiap pin sesuai
- * jenis perangkat yang dipilih. Pin OUTPUT menyala mengikuti status IO
- * terkini (ioLastStatus, di-update oleh refreshIoStatus()); pin INPUT
- * (Trigger) diberi tombol "Simulasi Trigger" supaya alur lengkap bisa
- * diuji dari browser saja, tanpa menunggu wiring/hardware fisik selesai.
- */
 function renderIoSimGrid() {
   const grid = document.getElementById('ioSimGrid');
   if (!grid) return;
   const pins = IO_PIN_MAPS[ioSelectedDeviceType] || IO_PIN_MAPS.arduino;
+  grid.innerHTML = '';
+  pins.forEach(function (pin) {
+    const isOn = (pin.key === 'TRIGGER') ? false : (ioLastStatus === pin.key);
+    const card = document.createElement('div');
+    card.className = 'io-pin-card';
+    card.innerHTML =
+      '<div class="small text-muted">' + (pin.dir === 'in' ? 'INPUT' : 'OUTPUT') + '</div>' +
+      '<div class="io-lamp ' + pin.lampClass + (isOn ? ' on' : '') + '"></div>' +
+      '<div class="small">' + pin.label + '</div>';
+    grid.appendChild(card);
+  });
 
-  grid.innerHTML = pins.map(function (p) {
-    const isOn = p.dir === 'out' && ioLastStatus === p.key;
-    const lampClass = 'io-lamp' + (isOn ? ' on io-lamp-' + p.key.toLowerCase() : '');
-    const actionHtml = p.dir === 'in'
-      ? '<button class="btn btn-sm btn-outline-info mt-2" id="btnSimulateTrigger">Simulasi Trigger</button>'
-      : '<span class="small text-muted mt-2">' + (isOn ? 'AKTIF' : 'Mati') + '</span>';
-    return '<div class="io-pin-card text-center">' +
-      '<div class="' + lampClass + '" id="ioLamp_' + p.key + '"></div>' +
-      '<div class="small mt-2">' + p.label + '</div>' +
-      actionHtml +
-      '</div>';
-  }).join('');
+  const simBtnWrap = document.createElement('div');
+  simBtnWrap.className = 'io-pin-card d-flex align-items-center justify-content-center';
+  simBtnWrap.innerHTML = '<button id="btnSimulateTrigger" class="btn btn-sm btn-primary">Simulasi Trigger</button>';
+  grid.appendChild(simBtnWrap);
 
-  const btnSim = document.getElementById('btnSimulateTrigger');
-  if (btnSim) {
-    btnSim.onclick = function () {
-      btnSim.disabled = true;
+  const simBtn = document.getElementById('btnSimulateTrigger');
+  if (simBtn) {
+    simBtn.addEventListener('click', function () {
+      simBtn.disabled = true;
+      const originalText = simBtn.innerText;
+      simBtn.innerText = 'Trigger...';
       callApi('apiSimulateDeviceTrigger', [CURRENT_SESSION]).then(function (res) {
-        btnSim.disabled = false;
+        simBtn.disabled = false;
+        simBtn.innerText = originalText;
         if (res && res.success === false) { alert(res.error); return; }
-        logSignal('TRIGGER (simulasi)');
+        logSignal('SIMULATOR-TRIGGER');
         refreshIoStatus();
       }).catch(function (err) {
-        btnSim.disabled = false;
-        alert('Gagal mengirim simulasi trigger: ' + err.message);
+        simBtn.disabled = false;
+        simBtn.innerText = originalText;
+        alert('Gagal simulasi trigger: ' + err.message);
       });
-    };
+    });
   }
 }
 
@@ -606,10 +602,9 @@ function refreshIoStatus() {
     document.getElementById('deviceStatusList').innerHTML =
       '<div class="d-flex justify-content-between"><span>Status Saat Ini</span><strong>' + res.status + '</strong></div>' +
       '<div class="text-muted small">Update: ' + (res.updatedAt || '-') + '</div>';
-
-    if (res.status !== ioLastStatus) {
+    if (res.status && res.status !== ioLastStatus) {
       ioLastStatus = res.status;
-      renderIoSimGrid(); // status berubah -> gambar ulang supaya lampu OUTPUT yang sesuai menyala
+      renderIoSimGrid();
     }
   }).catch(function (err) { console.warn('Gagal memuat status IO:', err.message); });
 }

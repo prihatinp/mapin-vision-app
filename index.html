@@ -2,13 +2,9 @@
 <html lang="id">
 <head>
 <meta charset="UTF-8">
-<!-- PENTING untuk tampilan HP: tanpa tag ini, browser HP akan merender
-     halaman seolah di layar desktop (lebar ~980px) lalu mengecilkannya
-     supaya muat di layar - akibatnya semua @media (max-width:900px) di
-     style.css TIDAK PERNAH aktif, dan pinch-zoom/double-tap zoom cuma
-     memperbesar tampilan yang sudah kacau itu tanpa menata ulang
-     layout-nya. Dengan width=device-width, halaman dirender pas selebar
-     layar device sejak awal, sehingga CSS responsive benar-benar aktif. -->
+<!-- Viewport wajib ada supaya CSS responsif (@media) benar-benar aktif & pinch-zoom
+     di HP/tablet me-reflow tata letak dengan benar, bukan cuma memperbesar layout
+     desktop yang di-render dengan asumsi lebar ~980px. -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MAP-IN Vision V1.0</title>
 <base target="_top">
@@ -30,10 +26,8 @@
   <div class="login-card glass-card">
     <div class="text-center mb-4">
       <div class="login-logo-box">
-        <img src="img/logo-mapin-vision.png" alt="MAP-IN Vision - Musashi Indonesia" class="login-logo-img">
+        <img src="img/logo-mapin-vision.png" class="login-logo-img" alt="MAP-IN Vision - Musashi Indonesia">
       </div>
-      <h2 class="brand-title">MAP-IN <span class="text-accent">VISION</span></h2>
-      <p class="brand-tagline">Intelligent Eyes for Manufacturing</p>
       <p class="text-muted small">Musashi Indonesia</p>
     </div>
     <form id="loginForm">
@@ -52,13 +46,15 @@
 </div>
 
 <div id="appShell" class="app-shell d-none">
+
+  <!-- Backdrop gelap di belakang sidebar saat dibuka di layar sempit (mobile drawer) -->
   <div id="sidebarBackdrop" class="sidebar-backdrop"></div>
 
   <!-- SIDEBAR -->
   <nav class="sidebar" id="sidebarNav">
     <div class="sidebar-brand">
       <div class="sidebar-logo-box">
-        <img src="img/logo-mapin-vision.png" alt="MAP-IN Vision - Musashi Indonesia" class="sidebar-logo-img">
+        <img src="img/logo-mapin-vision.png" class="sidebar-logo-img" alt="MAP-IN Vision">
       </div>
     </div>
     <ul class="nav-menu">
@@ -71,6 +67,7 @@
       <li data-view="ioMonitor"><span class="material-icons">memory</span> <span class="nav-label">External I/O (Arduino/ESP8266/PLC)</span></li>
       <li data-view="history"><span class="material-icons">history</span> <span class="nav-label">History & Traceability</span></li>
       <li data-view="settings"><span class="material-icons">settings</span> <span class="nav-label">Settings</span></li>
+      <li data-view="help"><span class="material-icons">help</span> <span class="nav-label">Help / Bantuan</span></li>
     </ul>
     <div class="sidebar-footer">
       <button id="logoutBtn" class="btn btn-sm btn-outline-light w-100">
@@ -82,7 +79,9 @@
   <!-- MAIN CONTENT -->
   <div class="main-content">
     <header class="topbar">
-      <button id="navToggleBtn" class="nav-toggle-btn" aria-label="Buka menu"><span class="material-icons">menu</span></button>
+      <button id="navToggleBtn" class="nav-toggle-btn" aria-label="Buka menu">
+        <span class="material-icons">menu</span>
+      </button>
       <div class="topbar-title" id="viewTitle">Dashboard</div>
       <div class="topbar-user">
         <span class="badge-role" id="userRoleBadge">Operator</span>
@@ -162,7 +161,7 @@
                 <div id="lastResultMeta" class="small d-none">
                   <img id="lastResultImg" class="dash-last-img d-none" alt="Foto hasil inspeksi terakhir">
                   <div id="lastResultImgLoading" class="text-center text-muted small py-3 d-none">Memuat foto...</div>
-                  <div id="lastResultImgTempNote" class="small text-muted d-none mb-2"><span class="material-icons align-middle" style="font-size:14px;">schedule</span> Foto sementara (belum disimpan permanen ke Drive) - tersedia beberapa jam saja.</div>
+                  <div id="lastResultImgTempNote" class="small text-muted d-none mb-2">Foto ini hasil OK - hanya tersimpan sementara (cache maks. 6 jam), bukan disimpan permanen ke Drive.</div>
                   <div class="dash-kv"><span>Recipe</span><b id="lastResultRecipe">-</b></div>
                   <div class="dash-kv"><span>Waktu</span><b id="lastResultTime">-</b></div>
                   <div class="dash-kv"><span>Cycle Time</span><b id="lastResultCycle">-</b></div>
@@ -399,14 +398,14 @@
               <div class="d-flex gap-2 align-items-center mb-2 flex-wrap">
                 <button id="btnRoiCaptureCamera" class="btn btn-sm btn-primary"><span class="material-icons align-middle" style="font-size:16px;">photo_camera</span> Ambil Gambar dari Kamera</button>
                 <button id="btnRoiOpenTestImage" class="btn btn-sm btn-outline-primary"><span class="material-icons align-middle" style="font-size:16px;">folder_open</span> Buka dari Test Images</button>
-                <button id="btnRoiUploadDevice" class="btn btn-sm btn-outline-primary"><span class="material-icons align-middle" style="font-size:16px;">upload_file</span> Upload dari Device</button>
+                <button id="btnRoiUploadDevice" class="btn btn-sm btn-outline-secondary"><span class="material-icons align-middle" style="font-size:16px;">upload_file</span> Upload dari Device</button>
                 <input type="file" id="roiUploadDeviceInput" accept="image/*" class="d-none">
                 <span id="roiCaptureStatus" class="small text-muted"></span>
               </div>
               <div id="roiEmptyState" class="text-center text-muted py-5">
                 <span class="material-icons" style="font-size:48px; opacity:.4;">image</span>
                 <p class="mb-0 mt-2">Belum ada gambar referensi untuk digambar ROI-nya.</p>
-                <p class="small mb-0">Klik "Ambil Gambar dari Kamera", "Buka dari Test Images", atau "Upload dari Device" (foto dari laptop/HP Anda) di atas untuk mulai.</p>
+                <p class="small mb-0">Pilih salah satu: "Ambil Gambar dari Kamera", "Buka dari Test Images", atau "Upload dari Device" (foto dari file di komputer/HP) di atas.</p>
               </div>
               <video id="roiCaptureVideo" class="d-none" autoplay playsinline muted></video>
               <canvas id="roiCanvas" class="d-none"></canvas>
@@ -533,11 +532,12 @@
         <div class="run-mode-wrapper">
           <div class="run-preview glass-card">
             <video id="runVideo" autoplay playsinline muted class="d-none"></video>
-            <img id="runTestImagePreview" class="d-none" style="width:100%; border-radius:var(--radius-md); background:#000; display:block;">
+            <img id="runTestImagePreview" class="d-none" alt="Foto test Run Mode">
             <canvas id="runOverlay"></canvas>
             <div id="runDecisionBadge" class="run-decision-badge">READY</div>
-            <div id="runCameraOffOverlay" style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; text-align:center; background:rgba(0,0,0,.75); color:#fff; border-radius:var(--radius-md); padding:1rem;">
-              <div><span class="material-icons align-middle me-2">videocam_off</span> Kamera belum menyala. Klik "Nyalakan Kamera (Live)" di panel kanan, atau upload gambar test untuk mulai mengukur.</div>
+            <div id="runCameraOffOverlay" style="position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; background:rgba(0,0,0,.75); color:#fff; border-radius:var(--radius-md); text-align:center; padding:1rem;">
+              <span class="material-icons align-middle mb-2" style="font-size:32px;">videocam_off</span>
+              Kamera belum aktif. Tekan "Nyalakan Kamera (Live)" di panel kanan,<br>atau gunakan "Upload Foto dari Device" kalau kamera tidak tersedia.
             </div>
           </div>
           <div class="run-sidepanel glass-card">
@@ -553,8 +553,8 @@
               <input type="radio" class="btn-check" name="runTriggerMode" id="triggerExternal" value="external" checked>
               <label class="btn btn-outline-primary btn-sm" for="triggerExternal">External (IO)</label>
             </div>
-            <p id="internalTriggerHint" class="d-none small text-muted mb-3">Mode manual - TIDAK ada capture otomatis berulang. Klik tombol "Measure (Trigger 1x)" di bawah setiap kali ingin mengukur 1 part.</p>
-            <p id="externalTriggerHint" class="small text-muted mb-3">Menunggu sinyal trigger dari Arduino/ESP8266/PLC (via status IO) - setiap 1 sinyal = 1 kali pengukuran. Pastikan perangkat sudah tersambung di menu "External I/O (Arduino/ESP8266/PLC)".</p>
+            <p id="internalTriggerHint" class="small text-muted mb-3 d-none">Mode manual: tekan tombol "Measure (Trigger 1x)" di bawah setiap kali mau mengukur 1 part. Tidak ada pengambilan otomatis berulang.</p>
+            <p id="externalTriggerHint" class="small text-muted mb-3">Menunggu sinyal trigger dari Arduino/ESP8266/PLC (via status IO External I/O). Setiap 1 sinyal baru masuk = 1 kali pengukuran otomatis (bukan berulang selama sinyal tertahan).</p>
 
             <label class="form-label small">Resolusi Kamera Run Mode</label>
             <select id="runResolutionSelect" class="form-select form-select-sm mb-2">
@@ -563,30 +563,29 @@
               <option value="1920x1080">1920 x 1080</option>
             </select>
             <button id="btnRunStopCamera" class="btn btn-sm btn-outline-success w-100 mb-2">Nyalakan Kamera (Live)</button>
-
-            <button id="btnRunUploadImage" class="btn btn-outline-info btn-sm w-100 mb-1"><span class="material-icons align-middle" style="font-size:16px;">upload_file</span> Upload Gambar Test</button>
+            <button id="btnRunUploadImage" class="btn btn-sm btn-outline-secondary w-100 mb-1">Upload Foto dari Device</button>
             <input type="file" id="runUploadImageInput" accept="image/*" class="d-none">
-            <p id="runUploadImageStatus" class="small text-muted mb-3"></p>
+            <div id="runUploadImageStatus" class="small text-muted mb-3"></div>
 
             <div class="run-counter"><span>OK</span><strong id="runOkCount">0</strong></div>
             <div class="run-counter"><span>NG</span><strong id="runNgCount">0</strong></div>
             <div class="run-counter"><span>Yield</span><strong id="runYield">0%</strong></div>
             <hr>
             <div id="runNgDetail" class="small text-danger"></div>
-            <div class="d-grid gap-2 mt-2 mb-3">
+            <div class="d-grid gap-2 mt-2 mb-1">
               <button id="btnPause" class="btn btn-outline-secondary btn-sm">Pause Trigger</button>
               <button id="btnRecapture" class="btn btn-primary btn-sm">Measure (Trigger 1x)</button>
             </div>
           </div>
         </div>
 
-        <div class="glass-card p-3 mt-3 run-judge-panel-wrap">
+        <div class="run-judge-panel-wrap glass-card p-3 mt-3">
           <div class="d-flex justify-content-between align-items-center mb-2">
-            <h5 class="mb-0">Adjusting Judge OK/NG</h5>
+            <h6 class="mb-0">Adjusting Judge OK/NG</h6>
             <button id="btnToggleJudgeAdjust" class="btn btn-sm btn-outline-secondary">Tutup</button>
           </div>
           <div id="judgeAdjustPanel">
-            <div id="judgeAdjustList"></div>
+            <div id="judgeAdjustList" class="small"></div>
             <div class="d-flex gap-2 mt-2">
               <button id="btnApplyJudgeAdjust" class="btn btn-sm btn-primary flex-fill">Terapkan (Live)</button>
               <button id="btnSaveJudgeAdjust" class="btn btn-sm btn-success flex-fill">Simpan ke Recipe</button>
@@ -647,11 +646,16 @@
         </div>
       </section>
 
-      <!-- ================= IO MONITOR VIEW ================= -->
+      <!-- ================= IO MONITOR / EXTERNAL I/O VIEW ================= -->
       <section id="view-ioMonitor" class="view d-none">
         <div class="glass-card p-3 mb-3">
-          <label class="form-label small">Jenis Perangkat External I/O</label>
-          <div class="btn-group w-100 mb-2" role="group">
+          <h6>Status Koneksi Perangkat</h6>
+          <div id="deviceStatusList"></div>
+        </div>
+
+        <div class="glass-card p-3 mb-3">
+          <h6 class="mb-2">Pilih Jenis Perangkat External I/O</h6>
+          <div class="btn-group w-100 mb-3" role="group">
             <input type="radio" class="btn-check" name="ioDeviceType" id="ioDeviceArduino" value="arduino" checked>
             <label class="btn btn-outline-primary btn-sm" for="ioDeviceArduino">Arduino Uno (USB)</label>
             <input type="radio" class="btn-check" name="ioDeviceType" id="ioDeviceEsp8266" value="esp8266">
@@ -659,62 +663,45 @@
             <input type="radio" class="btn-check" name="ioDeviceType" id="ioDevicePlc" value="plc">
             <label class="btn btn-outline-primary btn-sm" for="ioDevicePlc">PLC (Ethernet)</label>
           </div>
-          <p class="small text-muted mb-0">Pilih perangkat yang benar-benar dipakai di line produksi ini. Status "Saat Ini" dan simulasi lampu di bawah berlaku untuk perangkat manapun yang sedang mengirim sinyal ke sistem (statusnya sama-sama tersimpan di server, bukan per jenis perangkat).</p>
-        </div>
 
-        <div class="row g-3">
-          <div class="col-md-6">
-            <div class="glass-card p-3">
-              <h6>Status Koneksi Perangkat</h6>
-              <div id="deviceStatusList"></div>
-              <hr>
-
-              <div id="ioPanelArduino">
-                <h6>Arduino Uno (USB / WebSerial)</h6>
-                <p class="small text-muted mb-2">Hanya didukung browser Chrome/Edge. Kabel USB dari Arduino Uno dicolok ke PC/laptop yang membuka aplikasi ini.</p>
-                <span id="arduinoConnectionStatus" class="badge bg-secondary mb-2">Tidak Terhubung</span>
-                <div class="d-grid">
-                  <button id="btnConnectArduino" class="btn btn-sm btn-outline-primary">Hubungkan Arduino (USB)</button>
-                </div>
-              </div>
-
-              <div id="ioPanelEsp8266" class="d-none">
-                <h6>ESP8266 (WiFi)</h6>
-                <p class="small text-muted mb-2">ESP8266 terhubung ke WiFi pabrik dan mengirim sinyal lewat internet ke server - tidak perlu kabel USB ke PC. Status di atas otomatis ter-update tiap 1 detik selama halaman ini terbuka. Pastikan firmware <code>MAPIN_ESP8266.ino</code> sudah diisi WIFI_SSID/PASSWORD, WEBAPP_URL, dan API_TOKEN yang sama dengan <code>DEVICE_API_TOKEN</code> di Config.gs.</p>
-              </div>
-
-              <div id="ioPanelPlc" class="d-none">
-                <h6>PLC (Ethernet)</h6>
-                <p class="small text-muted mb-2">Apps Script hanya bisa menerima HTTP biasa (bukan protokol PLC seperti Modbus/Profinet langsung), jadi PLC harus mengirim request lewat modul Ethernet/web service bawaan PLC (atau gateway HTTP tambahan) dengan format PERSIS SAMA seperti ESP8266:</p>
-                <div class="log-box mb-2" style="height:auto; max-height:140px;">GET {URL_DEPLOYMENT_APPS_SCRIPT}/exec?action=trigger&device=PLC-LINE01&token={DEVICE_API_TOKEN}
-GET {URL_DEPLOYMENT_APPS_SCRIPT}/exec?action=getIoStatus&device=PLC-LINE01&token={DEVICE_API_TOKEN}
-(response JSON: {"status":"OK|NG|BUSY|ERROR|IDLE", ...})</div>
-                <p class="small text-muted mb-0">Pemetaan alamat digital I/O di sisi PLC (mis. %I0.0/%Q0.0 untuk Siemens, X0/Y0 untuk Mitsubishi, dsb.) tergantung merk/tipe PLC dan ditentukan oleh teknisi PLC di lapangan - hubungi Engineer PLC line produksi untuk memetakan sinyal Trigger IN dan output OK/NG/BUSY/ERROR ke alamat fisik yang sesuai.</p>
-              </div>
+          <div id="ioPanelArduino">
+            <p class="small text-muted mb-2">Koneksi lewat kabel USB memakai Web Serial API - hanya didukung browser Chrome/Edge di desktop/laptop. Firmware: <code>MAPIN_Arduino_Uno.ino</code>. Pin: D2=Trigger IN, D5=OK, D7=BUSY, D13=NG, D8=Error.</p>
+            <span id="arduinoConnectionStatus" class="badge bg-secondary mb-2">Tidak Terhubung</span>
+            <div class="d-grid">
+              <button id="btnConnectArduino" class="btn btn-sm btn-outline-primary">Hubungkan Arduino (USB)</button>
             </div>
           </div>
-          <div class="col-md-6">
-            <div class="glass-card p-3">
-              <h6>Manual Test Output</h6>
-              <div class="d-flex gap-2 mb-2">
-                <button class="btn btn-success btn-sm" data-signal="OK">OK</button>
-                <button class="btn btn-danger btn-sm" data-signal="NG">NG</button>
-                <button class="btn btn-warning btn-sm" data-signal="BUSY">BUSY</button>
-                <button class="btn btn-dark btn-sm" data-signal="ERROR">ERROR</button>
-              </div>
-              <h6 class="mt-3">Signal History</h6>
-              <div id="signalHistoryLog" class="log-box"></div>
+
+          <div id="ioPanelEsp8266" class="d-none">
+            <p class="small text-muted mb-2">ESP8266 terhubung lewat WiFi, melakukan HTTP polling ke Apps Script Web App (endpoint <code>?action=trigger</code> &amp; <code>?action=getIoStatus</code>). Pastikan ESP8266 & aplikasi memakai URL Web App & API token yang sama (lihat firmware <code>MAPIN_ESP8266.ino</code>).</p>
+            <p class="small text-muted mb-0">Status koneksi ESP8266 mengikuti status polling di kartu "Status Koneksi Perangkat" di atas - tidak perlu tombol koneksi manual di sisi aplikasi.</p>
+          </div>
+
+          <div id="ioPanelPlc" class="d-none">
+            <p class="small text-muted mb-2">PLC (Ethernet) memakai kontrak HTTP yang sama seperti ESP8266, karena Apps Script hanya bisa menerima HTTP biasa (bukan Modbus/Profinet native). Mapping alamat I/O fisik di sisi PLC (mis. <code>%I0.0</code>/<code>%Q0.0</code> gaya Siemens, atau <code>X0</code>/<code>Y0</code> gaya Mitsubishi) menyesuaikan merk PLC masing-masing - dikonsultasikan dengan engineer PLC terkait.</p>
+            <div class="border rounded p-2 small" style="background:rgba(0,0,0,.2); font-family:monospace;">
+              GET &lt;URL_WEBAPP&gt;?action=trigger&amp;token=&lt;API_TOKEN&gt;<br>
+              GET &lt;URL_WEBAPP&gt;?action=getIoStatus&amp;token=&lt;API_TOKEN&gt;
             </div>
           </div>
         </div>
 
-        <div class="glass-card p-3 mt-3">
-          <div class="d-flex justify-content-between align-items-center mb-2">
-            <h6 class="mb-0">Simulasi I/O (Lampu Indikator)</h6>
-            <span class="small text-muted">Nomor pin menyesuaikan jenis perangkat yang dipilih di atas</span>
-          </div>
-          <p class="small text-muted mb-3">Lampu HIJAU/warna = pin sedang aktif (HIGH). Untuk pin INPUT (Trigger), klik "Simulasi Trigger" untuk menguji seluruh alur (status jadi BUSY -> Run Mode otomatis mengukur -> OK/NG) tanpa perlu perangkat fisik benar-benar terpasang/wiring selesai.</p>
+        <div class="glass-card p-3 mb-3">
+          <h6>Simulasi I/O (Lampu Indikator)</h6>
+          <p class="small text-muted mb-2">Tampilan lampu ON/OFF untuk tiap pin sesuai perangkat yang dipilih. Tombol "Simulasi Trigger" menjalankan siklus inspeksi penuh tanpa perlu hardware fisik - berguna untuk uji coba software.</p>
           <div id="ioSimGrid" class="d-flex flex-wrap gap-3"></div>
+        </div>
+
+        <div class="glass-card p-3">
+          <h6>Manual Test Output</h6>
+          <div class="d-flex gap-2 mb-2">
+            <button class="btn btn-success btn-sm" data-signal="OK">OK</button>
+            <button class="btn btn-danger btn-sm" data-signal="NG">NG</button>
+            <button class="btn btn-warning btn-sm" data-signal="BUSY">BUSY</button>
+            <button class="btn btn-dark btn-sm" data-signal="ERROR">ERROR</button>
+          </div>
+          <h6 class="mt-3">Signal History</h6>
+          <div id="signalHistoryLog" class="log-box"></div>
         </div>
       </section>
 
@@ -749,6 +736,156 @@ GET {URL_DEPLOYMENT_APPS_SCRIPT}/exec?action=getIoStatus&device=PLC-LINE01&token
           <h6>Riwayat Backup</h6>
           <div id="backupHistoryList" class="border rounded p-2" style="max-height:200px; overflow-y:auto;">
             <span class="text-muted small">Memuat...</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= HELP / BANTUAN VIEW ================= -->
+      <section id="view-help" class="view d-none">
+        <div class="glass-card p-3 mb-3">
+          <h6><span class="material-icons align-middle" style="font-size:20px;">menu_book</span> Manual Book (Panduan Pengguna)</h6>
+          <p class="small text-muted mb-2">
+            Berisi panduan lengkap cara pakai aplikasi MAP-IN Vision dari awal (Login, Dashboard,
+            Recipe, ROI Editor, Run Mode, External I/O Arduino/ESP8266/PLC) sampai istilah-istilah
+            AI/vision yang dipakai. Klik tombol di bawah untuk membuka / mengunduh filenya (format
+            Microsoft Word / .docx) - bisa dibuka pakai Word, WPS, atau Google Docs.
+          </p>
+          <a href="docs/Manual_Book_MAPIN_Vision.docx" target="_blank" class="btn btn-primary btn-sm" download>
+            <span class="material-icons align-middle" style="font-size:16px;">download</span>
+            Buka / Download Manual Book
+          </a>
+          <span class="small text-muted d-block mt-2">
+            Tips: kalau terbuka di tab baru dan browser hanya menampilkan tulisan aneh, klik kanan
+            tombolnya lalu pilih "Save link as..." untuk simpan filenya dulu baru dibuka pakai Word.
+          </span>
+        </div>
+
+        <div class="glass-card p-3">
+          <h6><span class="material-icons align-middle" style="font-size:20px;">build</span> Problem Solving / Troubleshooting</h6>
+          <p class="small text-muted mb-3">Kumpulan masalah yang paling sering terjadi beserta solusinya. Klik judul untuk buka penjelasannya. Menu ini tidak akan menutup aplikasi - tinggal klik menu lain di kiri untuk kembali kapan saja.</p>
+
+          <div class="accordion" id="helpAccordion">
+
+            <div class="accordion-item">
+              <h2 class="accordion-header">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#help1">
+                  Kamera tidak muncul / layar hitam di Run Mode atau ROI Editor
+                </button>
+              </h2>
+              <div id="help1" class="accordion-collapse collapse" data-bs-parent="#helpAccordion">
+                <div class="accordion-body small">
+                  1. Pastikan browser sudah diberi izin akses kamera (klik ikon gembok/kamera di address bar).<br>
+                  2. Kamera hanya bisa dipakai lewat alamat HTTPS (GitHub Pages sudah HTTPS) - jangan buka lewat "http://" biasa.<br>
+                  3. Tutup aplikasi lain yang mungkin sedang memakai kamera yang sama (Zoom, Teams, dll).<br>
+                  4. Kalau memang tidak ada kamera fisik, pakai tombol "Upload Foto dari Device" sebagai gantinya.
+                </div>
+              </div>
+            </div>
+
+            <div class="accordion-item">
+              <h2 class="accordion-header">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#help2">
+                  Lampu ERROR di Arduino/ESP8266 menyala terus
+                </button>
+              </h2>
+              <div id="help2" class="accordion-collapse collapse" data-bs-parent="#helpAccordion">
+                <div class="accordion-body small">
+                  Lampu ERROR menandakan kamera gagal ambil gambar atau recipe yang dipakai tidak valid.<br>
+                  1. Cek apakah Recipe sudah dipilih & disimpan dengan minimal 1 tool aktif di ROI Editor.<br>
+                  2. Cek koneksi kamera (lihat solusi "Kamera tidak muncul" di atas).<br>
+                  3. Kirim perintah "RESET" dari aplikasi (tombol Reset di menu External I/O) untuk mematikan semua lampu lalu ulangi trigger.
+                </div>
+              </div>
+            </div>
+
+            <div class="accordion-item">
+              <h2 class="accordion-header">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#help3">
+                  Hasil OK/NG tidak sesuai / terlalu sensitif atau kurang sensitif
+                </button>
+              </h2>
+              <div id="help3" class="accordion-collapse collapse" data-bs-parent="#helpAccordion">
+                <div class="accordion-body small">
+                  1. Buka Run Mode, gunakan panel "Adjusting Judge OK/NG" untuk menggeser slider threshold
+                  tiap tool secara langsung (live) sambil lihat hasilnya berubah.<br>
+                  2. Kalau sudah pas, tekan "Terapkan (Live)" lalu simpan perubahan itu balik ke Recipe
+                  lewat menu Recipe Management supaya tersimpan permanen (bukan cuma sementara).<br>
+                  3. Kalau tool Blob/Edge Dimension sering salah tempat, cek ulang ROI-nya di ROI Editor -
+                  pastikan area yang digambar sudah pas menutupi bagian part yang mau diperiksa.
+                </div>
+              </div>
+            </div>
+
+            <div class="accordion-item">
+              <h2 class="accordion-header">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#help4">
+                  Foto hasil terakhir di Dashboard tidak muncul / "Foto sudah tidak tersedia"
+                </button>
+              </h2>
+              <div id="help4" class="accordion-collapse collapse" data-bs-parent="#helpAccordion">
+                <div class="accordion-body small">
+                  Untuk hasil OK, foto hanya disimpan sementara (cache) selama maksimal 6 jam untuk
+                  menghemat kapasitas Drive - bukan hilang permanen, memang didesain begitu. Kalau perlu
+                  foto OK disimpan permanen juga, ini bisa diatur ulang di pengaturan penyimpanan
+                  (Save Policy) pada Recipe terkait. Untuk hasil NG, foto SELALU disimpan permanen di
+                  Google Drive dan bisa dilihat kapan saja lewat menu History & Traceability.
+                </div>
+              </div>
+            </div>
+
+            <div class="accordion-item">
+              <h2 class="accordion-header">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#help5">
+                  "Gagal terhubung ke server" saat Login atau saat memakai aplikasi
+                </button>
+              </h2>
+              <div id="help5" class="accordion-collapse collapse" data-bs-parent="#helpAccordion">
+                <div class="accordion-body small">
+                  1. Cek koneksi internet.<br>
+                  2. Kemungkinan link Apps Script Web App berubah karena ada deployment baru - hubungi
+                  Admin/IT untuk cek apakah URL di js/api.js masih sesuai dengan deployment terbaru.<br>
+                  3. Pastikan deployment Apps Script di-set "Who has access: Anyone" supaya bisa diakses
+                  dari luar akun Google Admin.
+                </div>
+              </div>
+            </div>
+
+            <div class="accordion-item">
+              <h2 class="accordion-header">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#help6">
+                  External I/O (Arduino/ESP8266/PLC) tidak mau trigger otomatis
+                </button>
+              </h2>
+              <div id="help6" class="accordion-collapse collapse" data-bs-parent="#helpAccordion">
+                <div class="accordion-body small">
+                  1. Pastikan mode trigger di Run Mode sudah dipilih "External" (bukan "Internal").<br>
+                  2. Arduino Uno: cek koneksi USB & pastikan firmware MAPIN_Arduino_Uno.ino sudah ter-upload.
+                  Sinyal trigger di pin D2 harus berubah dari HIGH ke LOW (memakai INPUT_PULLUP) saat tombol
+                  ditekan.<br>
+                  3. ESP8266/PLC: pastikan device terhubung ke WiFi/jaringan yang sama & sudah bisa akses
+                  URL Apps Script Web App (test lewat menu External I/O &gt; Simulasi Trigger dulu untuk
+                  pastikan alur software-nya jalan, baru cek sisi hardware-nya).
+                </div>
+              </div>
+            </div>
+
+            <div class="accordion-item">
+              <h2 class="accordion-header">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#help7">
+                  Aplikasi terasa lambat / tampilan kacau saat di-zoom
+                </button>
+              </h2>
+              <div id="help7" class="accordion-collapse collapse" data-bs-parent="#helpAccordion">
+                <div class="accordion-body small">
+                  1. Sebaiknya pakai browser Chrome/Edge versi terbaru.<br>
+                  2. Kalau di HP/tablet, gunakan pinch-zoom di dalam layar - jangan zoom lewat pengaturan
+                  browser bawaan supaya tata letak menyesuaikan otomatis.<br>
+                  3. Tool OCR (baca teks) memang lebih lambat dibanding tool lain - gunakan seperlunya saja
+                  di recipe yang benar-benar butuh baca teks.
+                </div>
+              </div>
+            </div>
+
           </div>
         </div>
       </section>
