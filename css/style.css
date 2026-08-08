@@ -51,7 +51,7 @@ body{
 .login-card .text-muted{ color:var(--c-text-muted) !important; }
 .login-card .form-label{ color:var(--c-text); }
 .login-logo-box{ display:flex; justify-content:center; margin-bottom:.75rem; }
-.login-logo-img{ max-width:100%; height:auto; }
+.login-logo-img{ max-width:100%; height:auto; background:#fff; border-radius:10px; padding:.6rem .9rem; }
 
 /* ---------- App Shell ---------- */
 .app-shell{ display:flex; min-height:100vh; }
@@ -64,8 +64,11 @@ body{
 .brand-icon{ font-size:32px; color:var(--c-accent); }
 .brand-name{ font-weight:700; font-size:.95rem; letter-spacing:.5px; }
 .brand-sub{ font-size:.7rem; opacity:.7; }
-.sidebar-logo-box{ display:flex; justify-content:center; padding-top:.5rem; }
-.sidebar-logo-img{ max-width:100%; height:auto; filter:brightness(0) invert(1); opacity:.95; }
+/* Logo penuh warna (bukan siluet putih) di dalam kotak putih, supaya kontras
+   dan terbaca jelas di atas sidebar biru gelap - sesuai referensi tampilan
+   yang diminta (logo asli dgn warna, bukan di-invert). */
+.sidebar-logo-box{ display:flex; justify-content:center; padding:.5rem 1rem; }
+.sidebar-logo-img{ max-width:100%; height:auto; background:#fff; border-radius:8px; padding:.5rem .75rem; }
 
 /* ---------- Mobile sidebar drawer ---------- */
 .nav-toggle-btn{
