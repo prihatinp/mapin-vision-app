@@ -129,6 +129,9 @@ function showView(viewName) {
   if (_currentViewName === 'dashboard' && viewName !== 'dashboard') {
     stopDashboardPolling();
   }
+  if (_currentViewName === 'ioMonitor' && viewName !== 'ioMonitor') {
+    stopIoStatusPolling();
+  }
   _currentViewName = viewName;
 
   document.querySelectorAll('.view').forEach(function (v) { v.classList.add('d-none'); });
@@ -146,7 +149,7 @@ function showView(viewName) {
   if (viewName === 'roiEditor') initRoiEditor();
   if (viewName === 'run') initRunMode();
   if (viewName === 'history') loadHistory();
-  if (viewName === 'ioMonitor') refreshIoStatus();
+  if (viewName === 'ioMonitor') startIoStatusPolling();
   if (viewName === 'aiCenter') loadAiModelList();
   if (viewName === 'settings') loadBackupHistory();
 }
@@ -495,7 +498,42 @@ function loadHistory() {
   }).catch(function (err) { console.warn('Gagal memuat history:', err.message); });
 }
 
-/* ---------------- IO MONITOR ---------------- */
+/* ---------------- IO MONITOR / EXTERNAL I/O ---------------- */
+
+/**
+ * Pemetaan pin per jenis perangkat, sesuai dokumentasi pin mapping di
+ * firmware masing-masing (MAPIN_Arduino_Uno.ino / MAPIN_ESP8266.ino).
+ * PLC tidak punya nomor pin baku (tergantung merk/tipe PLC), jadi
+ * ditampilkan sebagai placeholder yang harus dipetakan sendiri oleh
+ * teknisi PLC di lapangan - lihat penjelasan di panel "PLC (Ethernet)".
+ */
+const IO_PIN_MAPS = {
+  arduino: [
+    { key: 'TRIGGER', label: 'D2 - Trigger IN', dir: 'in' },
+    { key: 'OK', label: 'D5 - OK OUT', dir: 'out' },
+    { key: 'NG', label: 'D6 - NG OUT', dir: 'out' },
+    { key: 'BUSY', label: 'D7 - BUSY OUT', dir: 'out' },
+    { key: 'ERROR', label: 'D8 - ERROR OUT', dir: 'out' }
+  ],
+  esp8266: [
+    { key: 'TRIGGER', label: 'D2 (GPIO4) - Trigger IN', dir: 'in' },
+    { key: 'OK', label: 'D5 (GPIO14) - OK OUT', dir: 'out' },
+    { key: 'NG', label: 'D6 (GPIO12) - NG OUT', dir: 'out' },
+    { key: 'BUSY', label: 'D7 (GPIO13) - BUSY OUT', dir: 'out' },
+    { key: 'ERROR', label: 'D8 (GPIO15) - ERROR OUT', dir: 'out' }
+  ],
+  plc: [
+    { key: 'TRIGGER', label: 'Trigger IN (alamat sesuai PLC, mis. %I0.0/X0)', dir: 'in' },
+    { key: 'OK', label: 'OK OUT (mis. %Q0.0/Y0)', dir: 'out' },
+    { key: 'NG', label: 'NG OUT (mis. %Q0.1/Y1)', dir: 'out' },
+    { key: 'BUSY', label: 'BUSY OUT (mis. %Q0.2/Y2)', dir: 'out' },
+    { key: 'ERROR', label: 'ERROR OUT (mis. %Q0.3/Y3)', dir: 'out' }
+  ]
+};
+
+let ioSelectedDeviceType = 'arduino';
+let ioLastStatus = 'IDLE';
+
 function bindIoMonitor() {
   document.querySelectorAll('#view-ioMonitor [data-signal]').forEach(function (btn) {
     btn.addEventListener('click', function () {
@@ -506,6 +544,80 @@ function bindIoMonitor() {
       });
     });
   });
+
+  document.querySelectorAll('input[name="ioDeviceType"]').forEach(function (radio) {
+    radio.onchange = function () {
+      ioSelectedDeviceType = radio.value;
+      document.getElementById('ioPanelArduino').classList.toggle('d-none', ioSelectedDeviceType !== 'arduino');
+      document.getElementById('ioPanelEsp8266').classList.toggle('d-none', ioSelectedDeviceType !== 'esp8266');
+      document.getElementById('ioPanelPlc').classList.toggle('d-none', ioSelectedDeviceType !== 'plc');
+      renderIoSimGrid();
+    };
+  });
+
+  renderIoSimGrid();
+}
+
+/**
+ * Menggambar "lampu" indikator (lingkaran ON/OFF) untuk tiap pin sesuai
+ * jenis perangkat yang dipilih. Pin OUTPUT menyala mengikuti status IO
+ * terkini (ioLastStatus, di-update oleh refreshIoStatus()); pin INPUT
+ * (Trigger) diberi tombol "Simulasi Trigger" supaya alur lengkap bisa
+ * diuji dari browser saja, tanpa menunggu wiring/hardware fisik selesai.
+ */
+function renderIoSimGrid() {
+  const grid = document.getElementById('ioSimGrid');
+  if (!grid) return;
+  const pins = IO_PIN_MAPS[ioSelectedDeviceType] || IO_PIN_MAPS.arduino;
+
+  grid.innerHTML = pins.map(function (p) {
+    const isOn = p.dir === 'out' && ioLastStatus === p.key;
+    const lampClass = 'io-lamp' + (isOn ? ' on io-lamp-' + p.key.toLowerCase() : '');
+    const actionHtml = p.dir === 'in'
+      ? '<button class="btn btn-sm btn-outline-info mt-2" id="btnSimulateTrigger">Simulasi Trigger</button>'
+      : '<span class="small text-muted mt-2">' + (isOn ? 'AKTIF' : 'Mati') + '</span>';
+    return '<div class="io-pin-card text-center">' +
+      '<div class="' + lampClass + '" id="ioLamp_' + p.key + '"></div>' +
+      '<div class="small mt-2">' + p.label + '</div>' +
+      actionHtml +
+      '</div>';
+  }).join('');
+
+  const btnSim = document.getElementById('btnSimulateTrigger');
+  if (btnSim) {
+    btnSim.onclick = function () {
+      btnSim.disabled = true;
+      callApi('apiSimulateDeviceTrigger', [CURRENT_SESSION]).then(function (res) {
+        btnSim.disabled = false;
+        if (res && res.success === false) { alert(res.error); return; }
+        logSignal('TRIGGER (simulasi)');
+        refreshIoStatus();
+      }).catch(function (err) {
+        btnSim.disabled = false;
+        alert('Gagal mengirim simulasi trigger: ' + err.message);
+      });
+    };
+  }
+}
+
+let ioStatusPollId = null;
+
+/**
+ * Status ESP8266/Arduino di halaman ini dulunya cuma diambil SEKALI saat
+ * halaman dibuka (tidak update lagi setelahnya) - padahal halaman ini
+ * justru dipakai untuk MENGUJI/DEBUG koneksi perangkat secara langsung
+ * (mis. menekan tombol trigger fisik lalu melihat status berubah ke BUSY).
+ * Sekarang di-polling tiap 1 detik selama operator berada di halaman ini,
+ * dan otomatis berhenti saat pindah menu (lihat showView()/stopIoStatusPolling()).
+ */
+function startIoStatusPolling() {
+  refreshIoStatus();
+  stopIoStatusPolling();
+  ioStatusPollId = setInterval(refreshIoStatus, 1000);
+}
+
+function stopIoStatusPolling() {
+  if (ioStatusPollId) { clearInterval(ioStatusPollId); ioStatusPollId = null; }
 }
 
 function refreshIoStatus() {
@@ -514,6 +626,11 @@ function refreshIoStatus() {
     document.getElementById('deviceStatusList').innerHTML =
       '<div class="d-flex justify-content-between"><span>Status Saat Ini</span><strong>' + res.status + '</strong></div>' +
       '<div class="text-muted small">Update: ' + (res.updatedAt || '-') + '</div>';
+
+    if (res.status !== ioLastStatus) {
+      ioLastStatus = res.status;
+      renderIoSimGrid(); // status berubah -> gambar ulang supaya lampu OUTPUT yang sesuai menyala
+    }
   }).catch(function (err) { console.warn('Gagal memuat status IO:', err.message); });
 }
 

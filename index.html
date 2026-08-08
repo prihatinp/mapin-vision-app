@@ -70,7 +70,7 @@
       <li data-view="roiEditor"><span class="material-icons">crop_free</span> <span class="nav-label">ROI Editor</span></li>
       <li data-view="run"><span class="material-icons">play_circle</span> <span class="nav-label">Run Mode</span></li>
       <li data-view="aiCenter"><span class="material-icons">smart_toy</span> <span class="nav-label">AI Detection Center</span></li>
-      <li data-view="ioMonitor"><span class="material-icons">memory</span> <span class="nav-label">Arduino / ESP8266 IO</span></li>
+      <li data-view="ioMonitor"><span class="material-icons">memory</span> <span class="nav-label">External I/O (Arduino/ESP8266/PLC)</span></li>
       <li data-view="history"><span class="material-icons">history</span> <span class="nav-label">History & Traceability</span></li>
       <li data-view="settings"><span class="material-icons">settings</span> <span class="nav-label">Settings</span></li>
     </ul>
@@ -555,7 +555,7 @@
               <label class="btn btn-outline-primary btn-sm" for="triggerExternal">External (IO)</label>
             </div>
             <p id="internalTriggerHint" class="d-none small text-muted mb-3">Mode manual - TIDAK ada capture otomatis berulang. Klik tombol "Measure (Trigger 1x)" di bawah setiap kali ingin mengukur 1 part.</p>
-            <p id="externalTriggerHint" class="small text-muted mb-3">Menunggu sinyal trigger dari Arduino/ESP8266/PLC (via status IO) - setiap 1 sinyal = 1 kali pengukuran. Pastikan perangkat sudah tersambung di menu "Arduino / ESP8266 IO".</p>
+            <p id="externalTriggerHint" class="small text-muted mb-3">Menunggu sinyal trigger dari Arduino/ESP8266/PLC (via status IO) - setiap 1 sinyal = 1 kali pengukuran. Pastikan perangkat sudah tersambung di menu "External I/O (Arduino/ESP8266/PLC)".</p>
 
             <label class="form-label small">Resolusi Kamera Run Mode</label>
             <select id="runResolutionSelect" class="form-select form-select-sm mb-2">
@@ -650,17 +650,47 @@
 
       <!-- ================= IO MONITOR VIEW ================= -->
       <section id="view-ioMonitor" class="view d-none">
+        <div class="glass-card p-3 mb-3">
+          <label class="form-label small">Jenis Perangkat External I/O</label>
+          <div class="btn-group w-100 mb-2" role="group">
+            <input type="radio" class="btn-check" name="ioDeviceType" id="ioDeviceArduino" value="arduino" checked>
+            <label class="btn btn-outline-primary btn-sm" for="ioDeviceArduino">Arduino Uno (USB)</label>
+            <input type="radio" class="btn-check" name="ioDeviceType" id="ioDeviceEsp8266" value="esp8266">
+            <label class="btn btn-outline-primary btn-sm" for="ioDeviceEsp8266">ESP8266 (WiFi)</label>
+            <input type="radio" class="btn-check" name="ioDeviceType" id="ioDevicePlc" value="plc">
+            <label class="btn btn-outline-primary btn-sm" for="ioDevicePlc">PLC (Ethernet)</label>
+          </div>
+          <p class="small text-muted mb-0">Pilih perangkat yang benar-benar dipakai di line produksi ini. Status "Saat Ini" dan simulasi lampu di bawah berlaku untuk perangkat manapun yang sedang mengirim sinyal ke sistem (statusnya sama-sama tersimpan di server, bukan per jenis perangkat).</p>
+        </div>
+
         <div class="row g-3">
           <div class="col-md-6">
             <div class="glass-card p-3">
               <h6>Status Koneksi Perangkat</h6>
               <div id="deviceStatusList"></div>
               <hr>
-              <h6>Arduino Uno (USB / WebSerial)</h6>
-              <p class="small text-muted mb-2">Hanya didukung browser Chrome/Edge. Alternatif nirkabel: gunakan ESP8266 (lihat status polling di atas, tidak perlu tombol ini).</p>
-              <span id="arduinoConnectionStatus" class="badge bg-secondary mb-2">Tidak Terhubung</span>
-              <div class="d-grid">
-                <button id="btnConnectArduino" class="btn btn-sm btn-outline-primary">Hubungkan Arduino (USB)</button>
+
+              <div id="ioPanelArduino">
+                <h6>Arduino Uno (USB / WebSerial)</h6>
+                <p class="small text-muted mb-2">Hanya didukung browser Chrome/Edge. Kabel USB dari Arduino Uno dicolok ke PC/laptop yang membuka aplikasi ini.</p>
+                <span id="arduinoConnectionStatus" class="badge bg-secondary mb-2">Tidak Terhubung</span>
+                <div class="d-grid">
+                  <button id="btnConnectArduino" class="btn btn-sm btn-outline-primary">Hubungkan Arduino (USB)</button>
+                </div>
+              </div>
+
+              <div id="ioPanelEsp8266" class="d-none">
+                <h6>ESP8266 (WiFi)</h6>
+                <p class="small text-muted mb-2">ESP8266 terhubung ke WiFi pabrik dan mengirim sinyal lewat internet ke server - tidak perlu kabel USB ke PC. Status di atas otomatis ter-update tiap 1 detik selama halaman ini terbuka. Pastikan firmware <code>MAPIN_ESP8266.ino</code> sudah diisi WIFI_SSID/PASSWORD, WEBAPP_URL, dan API_TOKEN yang sama dengan <code>DEVICE_API_TOKEN</code> di Config.gs.</p>
+              </div>
+
+              <div id="ioPanelPlc" class="d-none">
+                <h6>PLC (Ethernet)</h6>
+                <p class="small text-muted mb-2">Apps Script hanya bisa menerima HTTP biasa (bukan protokol PLC seperti Modbus/Profinet langsung), jadi PLC harus mengirim request lewat modul Ethernet/web service bawaan PLC (atau gateway HTTP tambahan) dengan format PERSIS SAMA seperti ESP8266:</p>
+                <div class="log-box mb-2" style="height:auto; max-height:140px;">GET {URL_DEPLOYMENT_APPS_SCRIPT}/exec?action=trigger&device=PLC-LINE01&token={DEVICE_API_TOKEN}
+GET {URL_DEPLOYMENT_APPS_SCRIPT}/exec?action=getIoStatus&device=PLC-LINE01&token={DEVICE_API_TOKEN}
+(response JSON: {"status":"OK|NG|BUSY|ERROR|IDLE", ...})</div>
+                <p class="small text-muted mb-0">Pemetaan alamat digital I/O di sisi PLC (mis. %I0.0/%Q0.0 untuk Siemens, X0/Y0 untuk Mitsubishi, dsb.) tergantung merk/tipe PLC dan ditentukan oleh teknisi PLC di lapangan - hubungi Engineer PLC line produksi untuk memetakan sinyal Trigger IN dan output OK/NG/BUSY/ERROR ke alamat fisik yang sesuai.</p>
               </div>
             </div>
           </div>
@@ -677,6 +707,15 @@
               <div id="signalHistoryLog" class="log-box"></div>
             </div>
           </div>
+        </div>
+
+        <div class="glass-card p-3 mt-3">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <h6 class="mb-0">Simulasi I/O (Lampu Indikator)</h6>
+            <span class="small text-muted">Nomor pin menyesuaikan jenis perangkat yang dipilih di atas</span>
+          </div>
+          <p class="small text-muted mb-3">Lampu HIJAU/warna = pin sedang aktif (HIGH). Untuk pin INPUT (Trigger), klik "Simulasi Trigger" untuk menguji seluruh alur (status jadi BUSY -> Run Mode otomatis mengukur -> OK/NG) tanpa perlu perangkat fisik benar-benar terpasang/wiring selesai.</p>
+          <div id="ioSimGrid" class="d-flex flex-wrap gap-3"></div>
         </div>
       </section>
 
