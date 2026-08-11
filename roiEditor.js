@@ -3,6 +3,13 @@
    Module 4: ROI Editor (Polygon, Drag & Drop Point, Multiple ROI)
    ================================================================== */
 
+// Penanda versi skrip - ditampilkan di badge kecil bawah kanvas ROI Editor
+// SUPAYA MUDAH DIPASTIKAN LEWAT MATA (tanpa buka DevTools, terutama di HP)
+// apakah file roiEditor.js yang AKTIF DI BROWSER sudah versi terbaru atau
+// masih versi lama yang ke-cache. Naikkan angka ini setiap kali file
+// dikirim ulang ke user.
+const ROI_EDITOR_VERSION = 'v2 (geser-tengah + sentuh HP + ROI Bulat/Masking)';
+
 let roiCanvasCtx = null;
 let roiList = [];
 let selectedRoiIndex = -1;
@@ -27,6 +34,12 @@ let editingToolId = null;
 function initRoiEditor() {
   const canvas = document.getElementById('roiCanvas');
   roiCanvasCtx = canvas.getContext('2d');
+
+  // Tampilkan badge versi skrip (lihat komentar ROI_EDITOR_VERSION di atas)
+  // - cara TERCEPAT memastikan file roiEditor.js yang jalan di browser HP
+  // benar-benar sudah versi terbaru, tanpa perlu buka DevTools.
+  const versionBadge = document.getElementById('roiEditorVersionBadge');
+  if (versionBadge) versionBadge.innerText = 'Skrip ROI Editor: ' + ROI_EDITOR_VERSION;
 
   const recipe = window.EDITING_RECIPE || { rois: [], tools: [] };
   window.EDITING_RECIPE = recipe;
