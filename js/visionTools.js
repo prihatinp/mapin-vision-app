@@ -40,6 +40,36 @@ const VisionTools = {
   },
 
   /**
+   * Crop area PERSEGI (bukan polygon-mask seperti cropRoi) di sekitar
+   * bounding box ROI, diperbesar marginPct % ke segala arah. Dipakai
+   * sebagai "search window" untuk Position Adjustment pada Pattern Match:
+   * memberi ruang gerak supaya cv.matchTemplate() bisa mencari posisi
+   * template terbaik, bukan cuma membandingkan 1 posisi piksel yang persis
+   * sama seperti ROI aslinya. Hasil crop di-clamp ke batas gambar sumber.
+   */
+  cropRoiWithSearchMargin: function (sourceCanvas, roi, marginPct) {
+    const xs = roi.points.map(function (p) { return p.x; });
+    const ys = roi.points.map(function (p) { return p.y; });
+    const minX = Math.min.apply(null, xs), maxX = Math.max.apply(null, xs);
+    const minY = Math.min.apply(null, ys), maxY = Math.max.apply(null, ys);
+    const w = maxX - minX, h = maxY - minY;
+    const m = (marginPct || 0) / 100;
+    const padX = w * m, padY = h * m;
+
+    const cx0 = Math.max(0, minX - padX);
+    const cy0 = Math.max(0, minY - padY);
+    const cx1 = Math.min(sourceCanvas.width, maxX + padX);
+    const cy1 = Math.min(sourceCanvas.height, maxY + padY);
+    const cw = cx1 - cx0, ch = cy1 - cy0;
+
+    const cropCanvas = document.createElement('canvas');
+    cropCanvas.width = cw;
+    cropCanvas.height = ch;
+    cropCanvas.getContext('2d').drawImage(sourceCanvas, cx0, cy0, cw, ch, 0, 0, cw, ch);
+    return cropCanvas;
+  },
+
+  /**
    * 1. PATTERN MATCHING - Template Matching (OpenCV.js matchTemplate)
    *    Mengembalikan similarity score 0..1. templateCanvas didapat dari
    *    TemplateCache (template referensi yang diambil Engineer di ROI
@@ -910,7 +940,14 @@ async function runInspectionCycle(isManualTrigger) {
     const toolResults = [];
     for (const tool of ACTIVE_RECIPE.tools) {
       const roi = ACTIVE_RECIPE.rois.find(function (r) { return r.id === tool.roiId; });
-      const roiCanvas = roi ? VisionTools.cropRoi(fullCanvas, roi) : fullCanvas;
+      // Position Adjustment: khusus PatternMatch, ROI yang dipotong untuk
+      // DICARI template-nya diperbesar sesuai searchMarginPct (bukan crop
+      // pas-pasan seperti tool lain), supaya ada ruang toleransi geser.
+      const roiCanvas = roi
+        ? (tool.type === 'PatternMatch'
+            ? VisionTools.cropRoiWithSearchMargin(fullCanvas, roi, (tool.params || {}).searchMarginPct)
+            : VisionTools.cropRoi(fullCanvas, roi))
+        : fullCanvas;
       const roiOffsetX = roi ? Math.min.apply(null, roi.points.map(function (p) { return p.x; })) : 0;
       const roiOffsetY = roi ? Math.min.apply(null, roi.points.map(function (p) { return p.y; })) : 0;
       const scale = (ACTIVE_RECIPE.calibration || {}).scaleFactorPxPerMm || 1;
