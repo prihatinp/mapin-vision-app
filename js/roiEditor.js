@@ -90,7 +90,8 @@ function initRoiEditor() {
     if (!backgroundImage) { alert('Tidak ada gambar referensi. Buka Camera Center/Run Mode dulu agar ada frame kamera.'); return; }
     const roi = roiList[selectedRoiIndex];
     const templateCanvas = VisionTools.cropRoi(backgroundImage, roi);
-    capturedTemplateBase64 = templateCanvas.toDataURL('image/png');
+    capturedTemplateBase64 = _encodeTemplateForStorage(templateCanvas);
+    if (!capturedTemplateBase64) return; // sudah alert di dalam _encodeTemplateForStorage
     alert('Template referensi diambil dari ' + roi.name + '. Klik "+ Tambah Tool ke ROI" untuk menyimpannya sebagai Pattern Match tool.');
   };
 
@@ -365,6 +366,45 @@ function selectTestImage(fileId) {
     if (statusEl) statusEl.innerText = 'Gambar referensi dimuat dari Test Images (' + tmp.width + 'x' + tmp.height + ').';
   };
   img.src = dataUri;
+}
+
+/**
+ * Encode template Pattern Match jadi base64 sekecil mungkin sebelum
+ * disimpan ke recipe (yang akhirnya ditulis ke 1 sel Google Sheets,
+ * batas keras 50.000 karakter/sel). PNG lossless dari foto kamera resolusi
+ * tinggi gampang tembus batas itu, apalagi kalau recipe punya beberapa
+ * tool Pattern Match sekaligus. Strategi: turunkan resolusi template (toh
+ * cuma dipakai untuk template matching, bukan ditampilkan besar-besar) lalu
+ * encode JPEG, coba beberapa kombinasi ukuran/kualitas sampai muat aman
+ * (target < 30.000 karakter, sisakan ruang utk data ROI/tool lain di recipe
+ * yang sama).
+ */
+function _encodeTemplateForStorage(templateCanvas) {
+  const MAX_CHARS = 30000;
+  const attempts = [
+    { maxDim: 260, quality: 0.80 },
+    { maxDim: 260, quality: 0.60 },
+    { maxDim: 180, quality: 0.60 },
+    { maxDim: 180, quality: 0.40 },
+    { maxDim: 120, quality: 0.40 }
+  ];
+
+  let best = null;
+  for (let i = 0; i < attempts.length; i++) {
+    const a = attempts[i];
+    const scale = Math.min(1, a.maxDim / Math.max(templateCanvas.width, templateCanvas.height));
+    const w = Math.max(1, Math.round(templateCanvas.width * scale));
+    const h = Math.max(1, Math.round(templateCanvas.height * scale));
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    c.getContext('2d').drawImage(templateCanvas, 0, 0, w, h);
+    const dataUri = c.toDataURL('image/jpeg', a.quality);
+    best = dataUri;
+    if (dataUri.length < MAX_CHARS) return dataUri;
+  }
+
+  alert('ROI yang dipilih terlalu besar/detail sehingga template masih melebihi batas 50.000 karakter per sel Google Sheets walau sudah dikompres maksimal. Coba perkecil area ROI-nya (fokus hanya ke bagian yang benar-benar mau dicocokkan, contoh: cincin tulisan bearing saja) lalu ambil template ulang.');
+  return null;
 }
 
 function getDefaultParamsForTool(type) {
