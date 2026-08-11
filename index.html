@@ -420,7 +420,18 @@
               <hr>
               <h6>Daftar ROI</h6>
               <ul id="roiList" class="list-group mb-2"></ul>
+              <label class="form-label small mb-1">Bentuk ROI Baru</label>
+              <select id="roiShapeSelect" class="form-select form-select-sm mb-2">
+                <option value="rect">⬛ Kotak (Rectangle)</option>
+                <option value="circle">⚪ Bulat (Circle)</option>
+                <option value="polygon">🔺 Masking Bebas (Freeform)</option>
+              </select>
               <button id="btnAddRoi" class="btn btn-sm btn-primary w-100 mb-2">+ Tambah ROI</button>
+              <p class="small text-muted mb-0">
+                <b>Geser seluruh ROI:</b> sentuh/klik di tengah bidang ROI lalu tarik.<br>
+                <b>Ubah bentuk/ukuran:</b> tarik titik biru di sudut (Kotak/Masking) atau di tepi (Bulat).<br>
+                <b>Tambah titik (Masking):</b> double-klik / double-tap di dalam ROI.
+              </p>
               <hr>
               <h6>Vision Tools</h6>
               <select id="toolTypeSelect" class="form-select form-select-sm mb-2">
