@@ -3,10 +3,29 @@
    Module 4: ROI Editor (Polygon, Drag & Drop Point, Multiple ROI)
    ================================================================== */
 
+// Penanda versi skrip - ditampilkan di badge kecil bawah kanvas ROI Editor
+// SUPAYA MUDAH DIPASTIKAN LEWAT MATA (tanpa buka DevTools, terutama di HP)
+// apakah file roiEditor.js yang AKTIF DI BROWSER sudah versi terbaru atau
+// masih versi lama yang ke-cache. Naikkan angka ini setiap kali file
+// dikirim ulang ke user.
+const ROI_EDITOR_VERSION = 'v2 (geser-tengah + sentuh HP + ROI Bulat/Masking)';
+
 let roiCanvasCtx = null;
 let roiList = [];
 let selectedRoiIndex = -1;
 let draggingPointIndex = -1;
+// dragMode: null | 'point' (tarik 1 titik sudut/handle) | 'move' (geser
+// seluruh ROI) | 'radius' (khusus ROI Bulat, tarik handle tepi utk ubah
+// ukuran). Ditambahkan supaya area TENGAH ROI juga bisa disentuh/klik utk
+// menggeser seluruh bentuk sekaligus, bukan cuma titik-titik sudutnya.
+let dragMode = null;
+let dragStart = null;
+let dragOrigPoints = null;
+let dragOrigCenter = null;
+// Deteksi double-tap di layar sentuh (pengganti dblclick, yg tidak ada di
+// touch) - dipakai utk menambah titik baru pada ROI Masking (polygon bebas).
+let _lastTapTime = 0;
+let _lastTapPos = null;
 let backgroundImage = null;
 let capturedTemplateBase64 = null;
 let editToolModalInstance = null;
@@ -15,6 +34,12 @@ let editingToolId = null;
 function initRoiEditor() {
   const canvas = document.getElementById('roiCanvas');
   roiCanvasCtx = canvas.getContext('2d');
+
+  // Tampilkan badge versi skrip (lihat komentar ROI_EDITOR_VERSION di atas)
+  // - cara TERCEPAT memastikan file roiEditor.js yang jalan di browser HP
+  // benar-benar sudah versi terbaru, tanpa perlu buka DevTools.
+  const versionBadge = document.getElementById('roiEditorVersionBadge');
+  if (versionBadge) versionBadge.innerText = 'Skrip ROI Editor: ' + ROI_EDITOR_VERSION;
 
   const recipe = window.EDITING_RECIPE || { rois: [], tools: [] };
   window.EDITING_RECIPE = recipe;
@@ -115,10 +140,21 @@ function initRoiEditor() {
   renderRoiList();
   redrawCanvas();
 
-  canvas.addEventListener('mousedown', onCanvasMouseDown);
-  canvas.addEventListener('mousemove', onCanvasMouseMove);
-  canvas.addEventListener('mouseup', function () { draggingPointIndex = -1; });
+  // Mouse (desktop) - dipertahankan seperti sebelumnya.
+  canvas.addEventListener('mousedown', _onRoiDragStart);
+  canvas.addEventListener('mousemove', _onRoiDragMove);
+  canvas.addEventListener('mouseup', _onRoiDragEnd);
+  canvas.addEventListener('mouseleave', _onRoiDragEnd);
   canvas.addEventListener('dblclick', onCanvasDoubleClick);
+
+  // Sentuhan (HP/tablet) - sebelumnya TIDAK ADA sama sekali, sehingga di
+  // HP titik sudut susah/tidak bisa ditarik. { passive: false } wajib
+  // supaya preventDefault() di dalam handler bisa mencegah layar ikut
+  // scroll/zoom saat jari menggeser ROI.
+  canvas.addEventListener('touchstart', _onRoiDragStart, { passive: false });
+  canvas.addEventListener('touchmove', _onRoiDragMove, { passive: false });
+  canvas.addEventListener('touchend', _onRoiTouchEnd, { passive: false });
+  canvas.addEventListener('touchcancel', _onRoiDragEnd);
 
   const btnRoiCaptureCamera = document.getElementById('btnRoiCaptureCamera');
   if (btnRoiCaptureCamera) btnRoiCaptureCamera.onclick = captureRoiReferenceFromCamera;
@@ -142,10 +178,39 @@ function initRoiEditor() {
       alert('Ambil gambar referensi dulu (tombol "Ambil Gambar dari Kamera" di atas) sebelum menambah ROI, supaya ROI-nya bisa digambar di atas gambar part yang benar.');
       return;
     }
+    const shapeSelect = document.getElementById('roiShapeSelect');
+    const shape = shapeSelect ? shapeSelect.value : 'rect';
     const name = 'ROI-' + (roiList.length + 1);
-    roiList.push({ id: 'roi_' + Date.now(), name: name, points: [
-      { x: 50, y: 50 }, { x: 200, y: 50 }, { x: 200, y: 200 }, { x: 50, y: 200 }
-    ]});
+    // ROI baru selalu dimulai dari TENGAH gambar referensi (bukan pojok
+    // kiri-atas tetap seperti sebelumnya) supaya langsung terlihat & mudah
+    // dijangkau berapapun ukuran/resolusi gambarnya.
+    const cx = backgroundImage.width / 2;
+    const cy = backgroundImage.height / 2;
+    const halfSize = Math.max(30, Math.min(backgroundImage.width, backgroundImage.height) * 0.15);
+
+    let roi;
+    if (shape === 'circle') {
+      roi = { id: 'roi_' + Date.now(), name: name, shape: 'circle', center: { x: cx, y: cy }, radius: halfSize, points: [] };
+      _syncCirclePoints(roi);
+    } else if (shape === 'polygon') {
+      // ROI Masking (bebas): mulai dari segi-6 supaya dari awal sudah
+      // terlihat "bukan kotak biasa" - titiknya tetap bisa digeser/ditambah
+      // (double-click / double-tap) menjadi bentuk bebas apa saja.
+      const N = 6;
+      const pts = [];
+      for (let i = 0; i < N; i++) {
+        const ang = (i / N) * 2 * Math.PI - Math.PI / 2;
+        pts.push({ x: cx + halfSize * Math.cos(ang), y: cy + halfSize * Math.sin(ang) });
+      }
+      roi = { id: 'roi_' + Date.now(), name: name, shape: 'polygon', points: pts };
+    } else {
+      roi = { id: 'roi_' + Date.now(), name: name, shape: 'rect', points: [
+        { x: cx - halfSize, y: cy - halfSize }, { x: cx + halfSize, y: cy - halfSize },
+        { x: cx + halfSize, y: cy + halfSize }, { x: cx - halfSize, y: cy + halfSize }
+      ]};
+    }
+
+    roiList.push(roi);
     selectedRoiIndex = roiList.length - 1;
     renderRoiList();
     renderToolList();
@@ -433,7 +498,8 @@ function renderRoiList() {
   roiList.forEach(function (roi, idx) {
     const li = document.createElement('li');
     li.className = 'list-group-item d-flex justify-content-between align-items-center' + (idx === selectedRoiIndex ? ' active' : '');
-    li.innerHTML = '<span>' + roi.name + '</span>';
+    const shapeIcon = roi.shape === 'circle' ? '⚪' : (roi.shape === 'polygon' ? '🔺' : '⬛');
+    li.innerHTML = '<span>' + shapeIcon + ' ' + roi.name + '</span>';
     const delBtn = document.createElement('button');
     delBtn.className = 'btn btn-sm btn-outline-danger';
     delBtn.innerText = 'x';
@@ -652,24 +718,43 @@ function redrawCanvas() {
   if (backgroundImage) roiCanvasCtx.drawImage(backgroundImage, 0, 0);
 
   roiList.forEach(function (roi, idx) {
+    const strokeColor = idx === selectedRoiIndex ? '#FF0000' : '#0055A4';
+    const fillColor = idx === selectedRoiIndex ? 'rgba(255,0,0,0.15)' : 'rgba(0,85,164,0.10)';
+
+    if (roi.shape === 'circle') {
+      roiCanvasCtx.beginPath();
+      roiCanvasCtx.arc(roi.center.x, roi.center.y, roi.radius, 0, 2 * Math.PI);
+      roiCanvasCtx.strokeStyle = strokeColor;
+      roiCanvasCtx.lineWidth = 2;
+      roiCanvasCtx.stroke();
+      roiCanvasCtx.fillStyle = fillColor;
+      roiCanvasCtx.fill();
+
+      // Handle di tepi kanan lingkaran = tarik utk ubah ukuran (radius).
+      _drawHandle({ x: roi.center.x + roi.radius, y: roi.center.y });
+      // Titik di tengah sekadar penanda visual pusat lingkaran.
+      _drawHandle(roi.center, 4);
+
+      roiCanvasCtx.fillStyle = '#003366';
+      roiCanvasCtx.font = '12px sans-serif';
+      roiCanvasCtx.fillText(roi.name, roi.center.x - roi.radius, roi.center.y - roi.radius - 8);
+      return;
+    }
+
+    // Rect / Polygon (Masking bebas) - keduanya sama-sama polygon titik.
     roiCanvasCtx.beginPath();
     roi.points.forEach(function (p, i) {
       if (i === 0) roiCanvasCtx.moveTo(p.x, p.y); else roiCanvasCtx.lineTo(p.x, p.y);
     });
     roiCanvasCtx.closePath();
-    roiCanvasCtx.strokeStyle = idx === selectedRoiIndex ? '#FF0000' : '#0055A4';
+    roiCanvasCtx.strokeStyle = strokeColor;
     roiCanvasCtx.lineWidth = 2;
     roiCanvasCtx.stroke();
-    roiCanvasCtx.fillStyle = idx === selectedRoiIndex ? 'rgba(255,0,0,0.15)' : 'rgba(0,85,164,0.10)';
+    roiCanvasCtx.fillStyle = fillColor;
     roiCanvasCtx.fill();
 
     // titik-titik polygon (draggable)
-    roi.points.forEach(function (p) {
-      roiCanvasCtx.beginPath();
-      roiCanvasCtx.arc(p.x, p.y, 5, 0, 2 * Math.PI);
-      roiCanvasCtx.fillStyle = '#003366';
-      roiCanvasCtx.fill();
-    });
+    roi.points.forEach(function (p) { _drawHandle(p); });
 
     roiCanvasCtx.fillStyle = '#003366';
     roiCanvasCtx.font = '12px sans-serif';
@@ -678,7 +763,66 @@ function redrawCanvas() {
 }
 
 /**
- * Konversi posisi klik mouse (koordinat CSS/layar, karena #roiCanvas
+ * Gambar 1 titik pegangan (handle sudut/radius). Radius visual diperbesar
+ * jadi 8px (sebelumnya 5px) + garis tepi putih supaya lebih kelihatan &
+ * lebih gampang disentuh tepat di tengahnya di layar HP.
+ */
+function _drawHandle(pt, r) {
+  r = r || 8;
+  roiCanvasCtx.beginPath();
+  roiCanvasCtx.arc(pt.x, pt.y, r, 0, 2 * Math.PI);
+  roiCanvasCtx.fillStyle = '#003366';
+  roiCanvasCtx.fill();
+  roiCanvasCtx.lineWidth = 2;
+  roiCanvasCtx.strokeStyle = '#FFFFFF';
+  roiCanvasCtx.stroke();
+}
+
+/** Regenerasi roi.points (poligon pendekatan lingkaran) dari center+radius.
+ * Dipanggil setiap kali center/radius ROI Bulat berubah, supaya seluruh
+ * logika backend/VisionTools yang SUDAH ADA (cropRoi, matchTemplate, dll -
+ * semuanya bekerja lewat roi.points) tetap jalan tanpa perlu diubah sama
+ * sekali; ROI Bulat "menyamar" sebagai polygon bersisi banyak (32 titik). */
+function _syncCirclePoints(roi) {
+  const N = 32;
+  const pts = [];
+  for (let i = 0; i < N; i++) {
+    const ang = (i / N) * 2 * Math.PI;
+    pts.push({ x: roi.center.x + roi.radius * Math.cos(ang), y: roi.center.y + roi.radius * Math.sin(ang) });
+  }
+  roi.points = pts;
+}
+
+/** Ray-casting standar: apakah titik pt ada di dalam polygon (array {x,y}). */
+function _pointInPolygon(pt, points) {
+  let inside = false;
+  for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+    const xi = points[i].x, yi = points[i].y;
+    const xj = points[j].x, yj = points[j].y;
+    const intersect = ((yi > pt.y) !== (yj > pt.y)) &&
+      (pt.x < (xj - xi) * (pt.y - yi) / (yj - yi) + xi);
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
+function _pointInRoi(pt, roi) {
+  if (roi.shape === 'circle') return Math.hypot(pt.x - roi.center.x, pt.y - roi.center.y) <= roi.radius;
+  return _pointInPolygon(pt, roi.points);
+}
+
+/**
+ * Ambil koordinat client (layar) dari event mouse ATAU sentuhan (touch),
+ * supaya semua fungsi drag di bawah bisa dipakai bersama utk keduanya.
+ */
+function _getEventClientXY(e) {
+  if (e.touches && e.touches.length) return { clientX: e.touches[0].clientX, clientY: e.touches[0].clientY };
+  if (e.changedTouches && e.changedTouches.length) return { clientX: e.changedTouches[0].clientX, clientY: e.changedTouches[0].clientY };
+  return { clientX: e.clientX, clientY: e.clientY };
+}
+
+/**
+ * Konversi posisi klik/sentuh (koordinat CSS/layar, karena #roiCanvas
  * sekarang di-scale via CSS width:100% supaya sama seperti monitor Camera
  * Center - lihat style.css) balik ke koordinat PIKSEL ASLI kanvas (tempat
  * roi.points sebenarnya disimpan/digambar). Tanpa ini, titik ROI akan
@@ -686,46 +830,149 @@ function redrawCanvas() {
  * aslinya (mis. gambar 1920x1080 ditampilkan lebar 800px di layar).
  */
 function _getCanvasPoint(e) {
-  const canvas = e.target;
+  const canvas = document.getElementById('roiCanvas');
   const rect = canvas.getBoundingClientRect();
   const scaleX = canvas.width / rect.width;
   const scaleY = canvas.height / rect.height;
+  const xy = _getEventClientXY(e);
   return {
-    x: (e.clientX - rect.left) * scaleX,
-    y: (e.clientY - rect.top) * scaleY
+    x: (xy.clientX - rect.left) * scaleX,
+    y: (xy.clientY - rect.top) * scaleY
   };
 }
 
-function onCanvasMouseDown(e) {
+/**
+ * Mulai drag (mousedown / touchstart). Urutan prioritas hit-test:
+ * 1. Handle radius ROI Bulat (tarik = ubah ukuran)
+ * 2. Titik sudut/masking (tarik = ubah bentuk) - SEKARANG toleransi lebih
+ *    besar khusus sentuhan (jari lebih besar dari ujung kursor mouse)
+ * 3. Area TENGAH bidang ROI (klik/sentuh = geser SELURUH ROI sekaligus) -
+ *    fitur BARU, sebelumnya cuma titik sudut yang bisa ditarik.
+ */
+function _onRoiDragStart(e) {
   if (selectedRoiIndex === -1) return;
+  const isTouch = !!(e.touches || e.changedTouches);
+  if (isTouch) e.preventDefault();
+
   const p0 = _getCanvasPoint(e);
   const roi = roiList[selectedRoiIndex];
 
-  // Toleransi jangkauan klik dijaga tetap ~8 piksel LAYAR (bukan piksel
-  // kanvas asli) supaya titik ROI tetap mudah diklik walau gambar aslinya
-  // besar dan ditampilkan mengecil (mis. 1920px ditampilkan di layar 800px).
-  const canvas = e.target;
+  const canvas = document.getElementById('roiCanvas');
   const rect = canvas.getBoundingClientRect();
   const scaleX = canvas.width / rect.width;
-  const hitToleranceCanvasPx = 8 * scaleX;
+  // Toleransi ~10px layar utk mouse, ~24px layar utk sentuhan (jari jauh
+  // lebih lebar dari ujung kursor mouse) - inilah yang bikin titik sudut
+  // dulu susah dipegang di HP walau sudah pas "kena" secara visual.
+  const hitToleranceCanvasPx = (isTouch ? 24 : 10) * scaleX;
 
-  draggingPointIndex = roi.points.findIndex(function (p) {
+  if (roi.shape === 'circle') {
+    const edgePt = { x: roi.center.x + roi.radius, y: roi.center.y };
+    if (Math.hypot(edgePt.x - p0.x, edgePt.y - p0.y) < hitToleranceCanvasPx) {
+      dragMode = 'radius';
+      draggingPointIndex = -1;
+      return;
+    }
+    if (_pointInRoi(p0, roi)) {
+      dragMode = 'move';
+      dragStart = p0;
+      dragOrigCenter = { x: roi.center.x, y: roi.center.y };
+      draggingPointIndex = -1;
+      return;
+    }
+    dragMode = null;
+    return;
+  }
+
+  const idx = roi.points.findIndex(function (p) {
     return Math.hypot(p.x - p0.x, p.y - p0.y) < hitToleranceCanvasPx;
   });
+  if (idx !== -1) {
+    dragMode = 'point';
+    draggingPointIndex = idx;
+    return;
+  }
+  if (_pointInRoi(p0, roi)) {
+    dragMode = 'move';
+    dragStart = p0;
+    dragOrigPoints = roi.points.map(function (p) { return { x: p.x, y: p.y }; });
+    draggingPointIndex = -1;
+    return;
+  }
+  dragMode = null;
 }
 
-function onCanvasMouseMove(e) {
-  if (draggingPointIndex === -1 || selectedRoiIndex === -1) return;
-  const p = _getCanvasPoint(e);
-  roiList[selectedRoiIndex].points[draggingPointIndex] = p;
-  redrawCanvas();
-}
-
-/** Double-click di dalam polygon = tambah titik baru di tengah edge terdekat */
-function onCanvasDoubleClick(e) {
-  if (selectedRoiIndex === -1) return;
+function _onRoiDragMove(e) {
+  if (!dragMode || selectedRoiIndex === -1) return;
+  if (e.touches) e.preventDefault();
   const p = _getCanvasPoint(e);
   const roi = roiList[selectedRoiIndex];
+
+  if (roi.shape === 'circle') {
+    if (dragMode === 'radius') {
+      roi.radius = Math.max(8, Math.hypot(p.x - roi.center.x, p.y - roi.center.y));
+      _syncCirclePoints(roi);
+      redrawCanvas();
+    } else if (dragMode === 'move') {
+      const dx = p.x - dragStart.x, dy = p.y - dragStart.y;
+      roi.center = { x: dragOrigCenter.x + dx, y: dragOrigCenter.y + dy };
+      _syncCirclePoints(roi);
+      redrawCanvas();
+    }
+    return;
+  }
+
+  if (dragMode === 'point') {
+    roi.points[draggingPointIndex] = p;
+    redrawCanvas();
+  } else if (dragMode === 'move') {
+    const dx = p.x - dragStart.x, dy = p.y - dragStart.y;
+    roi.points = dragOrigPoints.map(function (op) { return { x: op.x + dx, y: op.y + dy }; });
+    redrawCanvas();
+  }
+}
+
+function _onRoiDragEnd() {
+  dragMode = null;
+  draggingPointIndex = -1;
+  dragStart = null;
+  dragOrigPoints = null;
+  dragOrigCenter = null;
+}
+
+/**
+ * touchend: selesaikan drag seperti biasa, DITAMBAH deteksi double-tap
+ * (pengganti dblclick yang tidak ada di layar sentuh) supaya di HP pun
+ * bisa menambah titik baru pada ROI Masking (polygon bebas).
+ */
+function _onRoiTouchEnd(e) {
+  const wasMoving = !!dragMode;
+  _onRoiDragEnd();
+  if (selectedRoiIndex === -1 || wasMoving) return; // jangan anggap tap kalau tadi baru selesai geser/tarik
+  const roi = roiList[selectedRoiIndex];
+  if (!roi || roi.shape === 'circle') return; // ROI Bulat tidak memakai titik tambahan
+  if (!e.changedTouches || !e.changedTouches.length) return;
+
+  const t = e.changedTouches[0];
+  const now = Date.now();
+  const pos = { x: t.clientX, y: t.clientY };
+  if (_lastTapPos && (now - _lastTapTime) < 350 && Math.hypot(pos.x - _lastTapPos.x, pos.y - _lastTapPos.y) < 25) {
+    const p = _getCanvasPoint(e);
+    roi.points.push(p);
+    redrawCanvas();
+    _lastTapTime = 0;
+    _lastTapPos = null;
+  } else {
+    _lastTapTime = now;
+    _lastTapPos = pos;
+  }
+}
+
+/** Double-click (mouse, desktop) di dalam ROI = tambah titik baru (masking bebas). */
+function onCanvasDoubleClick(e) {
+  if (selectedRoiIndex === -1) return;
+  const roi = roiList[selectedRoiIndex];
+  if (roi.shape === 'circle') return; // ROI Bulat tidak memakai titik tambahan
+  const p = _getCanvasPoint(e);
   roi.points.push(p);
   redrawCanvas();
 }
