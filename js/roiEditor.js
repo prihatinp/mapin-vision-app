@@ -369,7 +369,12 @@ function selectTestImage(fileId) {
 
 function getDefaultParamsForTool(type) {
   switch (type) {
-    case 'PatternMatch': return { threshold: 0.80 };
+    // searchMarginPct = "Position Adjustment": ROI yang dipakai untuk MENCARI
+    // template saat inspeksi diperbesar sekian % dari ukuran ROI/template asli
+    // ke segala arah, supaya matchTemplate (OpenCV) punya ruang geser mencari
+    // posisi terbaik ala fitur Position Correction Keyence IV4 - bukan cuma
+    // membandingkan 1 posisi piksel yang persis sama seperti sebelumnya.
+    case 'PatternMatch': return { threshold: 0.80, searchMarginPct: 30 };
     case 'Blob': return { minAreaMm2: 1.0 };
     case 'EdgeDimension': return { toleranceMm: 5.0, nominalMm: 0, axis: 'x' };
     case 'Presence': return { expectPresent: true, pixelThresholdPct: 5 };
@@ -528,7 +533,8 @@ function buildParamsFormHtml(type, params) {
   switch (type) {
     case 'PatternMatch':
       return _field('Threshold Similarity (0-1)', 'number', 'p_threshold', params.threshold, { step: 0.01, min: 0, max: 1 }) +
-        '<p class="small text-muted mb-0">Template referensi diambil lewat tombol "Ambil Template dari ROI", bukan dari form ini.</p>';
+        _field('Margin Pencarian Posisi / Position Adjustment (%)', 'number', 'p_searchMarginPct', (params.searchMarginPct != null ? params.searchMarginPct : 30), { step: 5, min: 0, max: 200 }) +
+        '<p class="small text-muted mb-0">Margin pencarian = seberapa jauh sistem boleh mencari template di sekitar ROI kalau posisi part sedikit bergeser dari saat template diambil (seperti Position Correction di Keyence IV4). Makin besar % = makin toleran pergeseran, tapi proses makin berat & berisiko "salah nemu" pola mirip di sekitarnya. Template referensi diambil lewat tombol "Ambil Template dari ROI", bukan dari form ini.</p>';
     case 'Blob':
       return _field('Min Area Defect (mm²)', 'number', 'p_minAreaMm2', params.minAreaMm2, { step: 0.01, min: 0 });
     case 'EdgeDimension':
@@ -570,7 +576,7 @@ function readParamsFromForm(type, existingParams) {
 
   switch (type) {
     case 'PatternMatch':
-      return Object.assign({}, existingParams, { threshold: num('p_threshold') });
+      return Object.assign({}, existingParams, { threshold: num('p_threshold'), searchMarginPct: num('p_searchMarginPct') });
     case 'Blob':
       return Object.assign({}, existingParams, { minAreaMm2: num('p_minAreaMm2') });
     case 'EdgeDimension':
