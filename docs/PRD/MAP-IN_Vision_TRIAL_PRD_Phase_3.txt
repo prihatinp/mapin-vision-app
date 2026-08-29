@@ -1,0 +1,21 @@
+MAP-IN Vision (TRIAL) — PRD Phase 3
+
+This text companion is the repository source-of-truth summary. The complete PRD is maintained as the Phase 3 engineering blueprint and covers:
+
+1. Product: MAP-IN Vision (TRIAL), internal architecture V3.0, offline-first industrial vision, Jetson Xavier NX 8GB target.
+2. Existing web app: preserve as Legacy/Reference. Do NOT blindly merge it into Edge. Its GitHub Pages/GAS/browser architecture must not become an Edge runtime dependency.
+3. Target separation: legacy-web/ for existing prototype and mapin-edge/ for the new Jetson/offline application, after a Legacy Code Audit and approved migration plan.
+4. Correct workflow: OPEN CAMERA → LIVE → CAPTURE → MEMORY IMAGE → MASTERING → ADD TOOLS → TOOL SETTING → LEVEL / THRESHOLD ADJUSTMENT → I/O SETTING → TEST ↔ ADJUST → SAVE / LOCK RECIPE → RUN.
+5. TEST is an iterative loop and Memory/Test must never write production OK/NG to PLC or production I/O.
+6. Camera: industrial GigE/Basler reference, industrial USB, UVC webcam, simulator; OPEN/CLOSE/LIVE/CAPTURE/MEMORY/MASTER/TEST/RUN.
+7. Tools: Pattern/Position, Blob, Edge, Measurement, Presence/Absence, AI Identify/Classification/Defect/Count, future detection/segmentation.
+8. Level/threshold tuning: visual feedback, limits, score, sensitivity, tolerance, AI confidence and tool-specific settings.
+9. I/O: PLC adapter, Arduino Uno USB non-safety controller, simulator; READY/BUSY/OK/NG/ERROR plus Trigger/Part Present/Reset.
+10. Offline security: no Internet/cloud inference/automatic upload/sync/hidden telemetry; local images/models/recipes/results/logs; explicit auditable export.
+11. Jetson: development/training on PC; ONNX for development; TensorRT optimized inference on Jetson; monitor RAM/CPU/GPU/temperature/FPS/storage/I/O latency.
+12. Branding: [MUSASHI] MAP-IN Vision (TRIAL) [GO FAR BEYOND].
+13. Screens: Login, Home, Camera Setup, Memory Image, Mastering, Tool Selection, Tool Setting, Level Adjustment, I/O Configuration, Test Inspection, Recipe, Run, History, System/Health.
+14. Core entities: users, roles, permissions, projects, recipes, recipe_versions, masters, tools, tool_parameters, ai_models, camera_profiles, io_mappings, inspections, inspection_results, inspection_images, alarms, audit_logs, system_settings.
+15. Architecture interfaces: ICamera, IAIEngine, IInspectionTool, IIOController, IPLCEngine, IStorage, IRecipeRepository, IAuditLogger.
+16. Development order: Legacy Audit → safe separation → Edge foundation → Camera/UVC → Memory → Mastering → Tools → Level Adjustment → I/O → TEST loop → Recipe/Lock → Run/History → AI → Jetson/TensorRT → Genba.
+17. First Claude Code task: audit existing web application only; do not move/delete/rewrite/merge yet. Report architecture, features, reusable logic, online dependencies, technical debt, migration candidates, rewrite candidates, and safe separation plan. Stop for approval.
